@@ -230,6 +230,14 @@ class TestPageFilename:
     def test_double_dash_name_is_preserved(self):
         assert self.name("--") == "order---.md"
 
+    def test_user_dash_beside_an_unsafe_character_survives(self):
+        """The fallback must not read a real dash as one substitution left."""
+        assert self.name("-/-") == "order----.md"
+        assert self.name("/-") == "order---.md"
+
+    def test_name_of_only_dots_and_slashes_falls_back(self):
+        assert self.name("./.", index=4) == "order-page-4.md"
+
     def test_collisions_get_a_suffix(self):
         taken = set()
         first = self.name("A/B", taken=taken)
