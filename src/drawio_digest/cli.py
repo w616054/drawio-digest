@@ -15,6 +15,19 @@ EXT = {"markdown": ".md", "mermaid": ".mmd", "json": ".json"}
 _UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
+def _trim(name):
+    """Strip what Windows rejects at either end: blanks and dots.
+
+    Repeated until it settles, because one pass over ". . ." only peels off
+    the outermost layer and leaves formatting behind that reads as content.
+    """
+    while True:
+        trimmed = name.strip().strip(".")
+        if trimmed == name:
+            return trimmed
+        name = trimmed
+
+
 def _page_filename(stem, page_name, index, ext, taken):
     """Build 'stem-pagename.ext', keeping it legal and unique.
 
@@ -25,15 +38,14 @@ def _page_filename(stem, page_name, index, ext, taken):
     Length is deliberately not capped -- an over-long name makes write_text
     raise OSError, which the caller already reports.
     """
-    safe = _UNSAFE.sub("-", page_name)
-    # Trailing dots and surrounding blanks are rejected by Windows, and ".."
-    # would climb out of the output directory.
-    safe = safe.strip().strip(".").strip()
+    # ".." would climb out of the output directory, so trimming dots matters
+    # beyond Windows' own objection to them.
+    safe = _trim(_UNSAFE.sub("-", page_name))
     # Whether to fall back is decided on what the user typed, not on the
     # result: once substitution has run, a dash it introduced ("///") is
     # indistinguishable from one the user typed ("-/-"), and inspecting the
     # result discards real names that merely sit next to an unsafe character.
-    if not _UNSAFE.sub("", page_name).strip().strip(".").strip():
+    if not _trim(_UNSAFE.sub("", page_name)):
         safe = "page-%d" % index
 
     name = "%s-%s" % (stem, safe)

@@ -238,6 +238,15 @@ class TestPageFilename:
     def test_name_of_only_dots_and_slashes_falls_back(self):
         assert self.name("./.", index=4) == "order-page-4.md"
 
+    def test_alternating_dots_and_blanks_fall_back(self):
+        """One trim pass peels only the outer layer off '. . .'."""
+        assert self.name(". . .", index=5) == "order-page-5.md"
+        assert self.name(". . . .", index=6) == "order-page-6.md"
+
+    def test_interior_dot_is_kept(self):
+        """Only the ends are unsafe; 'a.b' is an ordinary name."""
+        assert self.name("a.b") == "order-a.b.md"
+
     def test_collisions_get_a_suffix(self):
         taken = set()
         first = self.name("A/B", taken=taken)
