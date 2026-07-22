@@ -78,6 +78,23 @@ class TestCompressed:
         assert len(page.edges) == 1
 
 
+class TestMultiPage:
+    def test_every_diagram_becomes_a_page(self):
+        pages = parse(FIXTURES / "multipage.drawio").pages
+        assert [p.name for p in pages] == ["Overview", "Detail/Sub", "Page"]
+
+    def test_pages_keep_their_own_content(self):
+        pages = parse(FIXTURES / "multipage.drawio").pages
+        assert labels(pages[0]) == {"Start", "Review"}
+        assert labels(pages[1]) == {"Check", "Done"}
+
+    def test_dropped_edge_is_isolated_to_its_page(self):
+        """--strict must be able to tell which page is at fault."""
+        pages = parse(FIXTURES / "multipage.drawio").pages
+        assert pages[0].dropped == []
+        assert len(pages[1].dropped) == 1
+
+
 class TestLabels:
     def test_br_becomes_separator(self, lanes):
         assert "确认接收 / 通知" in labels(lanes)
