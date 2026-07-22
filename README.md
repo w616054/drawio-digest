@@ -1,6 +1,7 @@
 # drawio-digest
 
-Extract the structure of a `.drawio` diagram as **Mermaid** or **JSON**.
+Extract the structure of a `.drawio` diagram as **Markdown**, **Mermaid** or
+**JSON**.
 
 `.drawio` files are XML, but they are XML describing a *canvas* — shapes and
 coordinates, not meaning. That makes them awkward to diff in review, and

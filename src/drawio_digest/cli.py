@@ -3,6 +3,7 @@ import argparse
 import sys
 from pathlib import Path
 
+from . import __version__
 from .parser import parse, parse_string
 from .render import to_json, to_markdown, to_mermaid, to_summary
 
@@ -14,6 +15,8 @@ def build_parser():
         prog="drawio-digest",
         description="Extract structure from .drawio files as Markdown, Mermaid or JSON.",
     )
+    ap.add_argument("--version", action="version",
+                    version="drawio-digest %s" % __version__)
     ap.add_argument("files", nargs="+", type=str, metavar="FILE",
                     help=".drawio files to convert; use - to read stdin")
     ap.add_argument("-f", "--format", choices=("markdown", "mermaid", "json"),

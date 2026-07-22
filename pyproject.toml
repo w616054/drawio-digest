@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "drawio-digest"
 version = "0.1.0"
-description = "Extract structure from draw.io diagrams as Mermaid or JSON"
+description = "Extract structure from draw.io diagrams as Markdown, Mermaid or JSON"
 readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }

@@ -201,6 +201,31 @@ class TestReadme:
         actual = to_markdown(parse(self.ROOT / "examples" / "order-review.drawio")).strip()
         assert claimed == actual
 
+    def test_supported_formats_are_described_consistently(self):
+        """README, package metadata and --help must name the same formats."""
+        from drawio_digest.cli import EXT, build_parser
+
+        formats = set(EXT)
+        action = next(a for a in build_parser()._actions if a.dest == "format")
+        assert set(action.choices) == formats
+
+        blurb = "Markdown, Mermaid or JSON"
+        assert blurb in build_parser().description
+        assert blurb in (self.ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
+        for fmt in formats:
+            assert fmt.capitalize() in readme or "`%s`" % fmt in readme
+
+    def test_version_matches_pyproject(self):
+        """__version__ is read from metadata; guard the fallback literal too."""
+        import drawio_digest
+        text = (self.ROOT / "pyproject.toml").read_text(encoding="utf-8")
+        declared = re.search(r'^version = "([^"]+)"', text, re.M).group(1)
+        assert drawio_digest.__version__ == declared
+        init = (self.ROOT / "src" / "drawio_digest" / "__init__.py").read_text(encoding="utf-8")
+        fallback = re.search(r'__version__ = "([^"]+)"', init).group(1)
+        assert fallback == declared
+
     def test_no_chinese_in_user_facing_output(self):
         """The project documents itself in English; messages should match."""
         cjk = re.compile(r"[一-鿿]")
