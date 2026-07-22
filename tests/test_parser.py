@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -187,6 +188,30 @@ class TestStdin:
     def test_invalid_xml_raises_valueerror(self):
         with pytest.raises(ValueError):
             parse_string("<mxfile><broken>")
+
+
+class TestReadme:
+    """The README shows real output; keep it from drifting."""
+
+    ROOT = Path(__file__).parent.parent
+
+    def test_example_matches_documented_output(self):
+        readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
+        claimed = re.search(r"````markdown\n(.*?)````", readme, re.S).group(1).strip()
+        actual = to_markdown(parse(self.ROOT / "examples" / "order-review.drawio")).strip()
+        assert claimed == actual
+
+    def test_no_chinese_in_user_facing_output(self):
+        """The project documents itself in English; messages should match."""
+        cjk = re.compile(r"[一-鿿]")
+        text = to_markdown(parse(FIXTURES / "dangling.drawio"))
+        # Note headers are the tool's own words; the "> - ..." lines below
+        # them are diagram labels and must keep whatever language they use.
+        headers = [ln for ln in text.splitlines()
+                   if ln.startswith(">") and not ln.startswith("> -")]
+        assert headers, "expected review note headers"
+        assert not any(cjk.search(ln) for ln in headers), headers
+        assert "通知" in text, "diagram labels must be preserved verbatim"
 
 
 class TestCli:

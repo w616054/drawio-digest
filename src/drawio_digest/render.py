@@ -57,7 +57,8 @@ def to_markdown(diagram, direction="TD", notes=True):
     for page in diagram.pages:
         block = "```mermaid\n%s\n```" % _mermaid_page(page, direction)
         if notes and page.recovered:
-            block += "\n\n> ℹ️ 以下连线端点未真正吸附到节点，已按坐标就近还原，请确认：\n"
+            block += ("\n\n> ℹ️ These connections were not bound to a shape in the "
+                      "source file and were reattached by coordinate. Please verify:\n")
             block += "\n".join(
                 "> - %s -> %s%s" % (
                     _label(page, e.source), _label(page, e.target),
@@ -66,7 +67,8 @@ def to_markdown(diagram, direction="TD", notes=True):
                 for e in page.recovered
             )
         if notes and page.dropped:
-            block += "\n\n> ⚠️ 以下连线端点悬空，无法确定目标，已跳过，请人工核对：\n"
+            block += ("\n\n> ⚠️ These connections have an unattached endpoint that "
+                      "could not be resolved and were skipped. Please check them:\n")
             block += "\n".join("> - %s" % d for d in page.dropped)
         if multi:
             block = "## %s\n\n%s" % (page.name, block)

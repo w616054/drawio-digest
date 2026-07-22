@@ -38,16 +38,18 @@ on or within `20px` of a shape, and **flags it for review** rather than
 fixing it silently:
 
 ```
-> ℹ️ 以下连线端点未真正吸附到节点，已按坐标就近还原，请确认：
-> - 下发考核任务 -> 管理员确认接收 通知 (通知)
+> ℹ️ These connections were not bound to a shape in the source file and were
+> reattached by coordinate. Please verify:
+> - Place order -> In stock? (submit)
 ```
 
 If an endpoint is too far from anything to be certain, the edge is **dropped
 and reported** — never guessed:
 
 ```
-> ⚠️ 以下连线端点悬空，无法确定目标，已跳过，请人工核对：
-> - 提交给集团 -> ?
+> ⚠️ These connections have an unattached endpoint that could not be resolved
+> and were skipped. Please check them:
+> - Ship parcel -> ?
 ```
 
 The right fix is in the source diagram: drag the endpoint until the *whole
@@ -84,13 +86,12 @@ model, for scripts.
 which is the cheap first step when scanning a repository:
 
 ```
-$ drawio-digest docs/*.drawio --summary
-review-flow
-第 1 页: 39 nodes, 46 edges, 2 lanes
-  lanes: 二级企业(12), 集团(27)
-  entry: 开始
-  exit: 结束, 查看分数
-  dropped: 2 edge(s) unresolved
+$ drawio-digest examples/*.drawio --summary
+order-review
+Page 1: 9 nodes, 9 edges, 2 lanes
+  lanes: Customer(5), Store(4)
+  entry: Start
+  exit: End
 ```
 
 Nodes that touch no edge are reported as `unconnected` rather than counted
@@ -119,29 +120,48 @@ diagram = parse_string(xml_text)          # already in memory
 
 ## Output
 
-Lanes become `subgraph` blocks; rhombus and ellipse shapes are preserved:
+`examples/order-review.drawio` is a two-lane order flow. Running
+`drawio-digest examples/order-review.drawio` produces:
 
 ````markdown
-# flow
+# order-review
 
 ```mermaid
 flowchart TD
-    subgraph lane0["Group"]
-        n0(["开始"])
-        n1["下发任务"]
-        n2{"是否通过"}
+    subgraph lane0["Customer"]
+        n0(["Start"])
+        n1["Browse catalogue"]
+        n2["Place order"]
+        n3["Pay"]
+        n4(["End"])
     end
-    subgraph lane1["Subsidiary"]
-        n3["确认接收 / 通知"]
+    subgraph lane1["Store"]
+        n5{"In stock?"}
+        n6["Reserve items"]
+        n7["Create backorder"]
+        n8["Ship parcel"]
     end
 
     n0 --> n1
-    n1 -->|"通知"| n3
-    n2 -->|"通过"| n3
+    n1 --> n2
+    n2 -->|"submit"| n5
+    n5 -->|"yes"| n6
+    n5 -->|"no"| n7
+    n6 -->|"invoice"| n3
+    n3 -->|"paid"| n8
+    n8 --> n4
+    n7 -->|"restocked"| n5
 ```
 ````
 
-Multi-page diagrams produce one `##` section and one fenced block per page.
+Lanes become `subgraph` blocks, rhombus and ellipse shapes are preserved,
+and edge labels survive whether they are stored on the edge or as separate
+`edgeLabel` cells. Multi-page diagrams produce one `##` section and one
+fenced block per page.
+
+Node ids are numbered lane by lane rather than in document order, so editing
+one part of a diagram does not renumber the rest — regenerated output stays
+diffable.
 
 ## Limitations
 

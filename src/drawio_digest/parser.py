@@ -75,7 +75,8 @@ def _graph_models(root):
             inner = ET.fromstring(unquote(raw.decode("utf-8")))
         except Exception as exc:  # noqa: BLE001 - report and skip this page
             raise ValueError(
-                "无法解压该页，请在 draw.io 中取消勾选 File > Properties > Compressed 后另存"
+                "could not decompress this page; re-save it from draw.io with "
+                "File > Properties > Compressed unchecked"
             ) from exc
         yield diagram.get("name") or "Page", inner
 
@@ -216,7 +217,7 @@ def _parse_page(name, model):
             # source diagram, and the edge itself is real.
             def describe(cell_id, resolved):
                 if resolved in raw_nodes and not raw_nodes[resolved][0]:
-                    return "(未命名图形)"
+                    return "(untitled shape)"
                 return raw_nodes.get(cell_id, ("", None, None))[0] or "?"
 
             a = describe(edge.get("source"), src)
@@ -250,7 +251,7 @@ def parse(path):
     try:
         root = ET.parse(path).getroot()
     except ET.ParseError as exc:
-        raise ValueError("不是有效的 XML：%s" % exc) from exc
+        raise ValueError("not valid XML: %s" % exc) from exc
     return _build(root, path.stem)
 
 
@@ -259,5 +260,5 @@ def parse_string(text, name="diagram"):
     try:
         root = ET.fromstring(text)
     except ET.ParseError as exc:
-        raise ValueError("不是有效的 XML：%s" % exc) from exc
+        raise ValueError("not valid XML: %s" % exc) from exc
     return _build(root, name)
