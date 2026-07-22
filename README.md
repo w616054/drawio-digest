@@ -220,7 +220,7 @@ print(to_markdown(select_pages(diagram, ["Overview", "3"])))
 - [x] JSON, for scripts and further processing
 - [x] `--summary` — shape, lanes, entry/exit points in a few lines
 - [x] `--direction TD|LR|BT|RL` for Mermaid flow direction
-- [x] Multi-page diagrams — one section and one block per page
+- [x] Multi-page diagrams — one section and one block per page, or one file each with `--split`
 
 </details>
 
@@ -260,6 +260,7 @@ print(to_markdown(select_pages(diagram, ["Overview", "3"])))
 - [ ] Layout, colours and styling beyond node shape
 - [ ] Images and custom shape libraries
 - [ ] Nested lanes — an inner lane is dropped and its nodes fall to the outer one
+- [ ] Cross-page links — a shape linking to another page is not followed, so pages stay separate graphs
 - [ ] Writing `.drawio` back out — this tool only reads
 
 </details>

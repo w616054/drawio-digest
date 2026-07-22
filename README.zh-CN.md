@@ -208,7 +208,7 @@ print(to_markdown(select_pages(diagram, ["Overview", "3"])))
 - [x] JSON，供脚本和后续处理使用
 - [x] `--summary`——用几行给出规模、泳道、起止节点
 - [x] `--direction TD|LR|BT|RL` 控制 Mermaid 流向
-- [x] 多页图——每页一个小节、一个代码块
+- [x] 多页图——每页一个小节、一个代码块，或用 `--split` 每页一个文件
 
 </details>
 
@@ -248,6 +248,7 @@ print(to_markdown(select_pages(diagram, ["Overview", "3"])))
 - [ ] 布局、颜色，以及节点形状之外的样式
 - [ ] 图片和自定义图形库
 - [ ] 嵌套泳道——内层泳道会被丢弃，其中的节点归到外层
+- [ ] 跨页跳转链接——形状指向另一页的链接不会被跟随，各页仍是独立的图
 - [ ] 反向写回 `.drawio`——本工具只读
 
 </details>
