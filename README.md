@@ -1,71 +1,100 @@
 # drawio-digest
 
-Extract the structure of a `.drawio` diagram as **Markdown**, **Mermaid** or
-**JSON**.
-
-`.drawio` files are XML, but they are XML describing a *canvas* — shapes and
-coordinates, not meaning. That makes them awkward to diff in review, and
-opaque to scripts and LLMs. `drawio-digest` reads the geometry and recovers
-the structure: nodes, edges, labels, and lanes.
-
-```bash
-drawio-digest flow.drawio              # -> flow.md    Markdown + Mermaid
-drawio-digest flow.drawio -f mermaid   # -> flow.mmd   bare diagram source
-drawio-digest flow.drawio -f json      # -> flow.json  structured data
-drawio-digest *.drawio --summary       # one short block per diagram
-cat flow.drawio | drawio-digest -      # stdin
-```
-
-It is a plain CLI, which means both you and a coding agent can use it —
-Claude Code, Codex and friends already know how to run shell commands, so
-no plugin or integration is required.
+**Your `.drawio` diagrams, readable by LLMs — and by humans in code review.**
 
 [中文文档](README.zh-CN.md)
 
-## Features
+draw.io saves a *canvas* — shapes and coordinates, not meaning. That makes
+diagrams opaque to reviewers, scripts and coding agents. `drawio-digest`
+reads the geometry and recovers the structure: nodes, edges, labels, lanes.
 
-**Output**
+**What you drew:**
 
-- [x] Markdown document — a title, a fenced mermaid block per page, review notes
-- [x] Bare Mermaid source, for embedding in a document you already have
-- [x] JSON, for scripts and further processing
-- [x] `--summary` — shape, lanes, entry/exit points in a few lines
-- [x] `--direction TD|LR|BT|RL` for Mermaid flow direction
-- [x] Multi-page diagrams — one section and one block per page
+<p align="center">
+  <img src="examples/order-review.png" alt="A two-lane order flow drawn in draw.io" width="640">
+</p>
 
-**Structure recovery**
+**What you get** — one command, and GitHub renders the result:
 
-- [x] Lanes detected by containment, including plain rectangles used as lanes
-- [x] Explicit `swimlane` shapes
-- [x] Flat diagrams with no lanes at all
-- [x] Node shapes — box, diamond, ellipse
-- [x] Edge labels stored inline *or* as separate `edgeLabel` cells
-- [x] Endpoints that look attached but are not, reattached by coordinate and flagged
-- [x] Unresolvable endpoints reported, never guessed
-- [x] `endArrow=none` dividers and unconnected annotations excluded from the flow
-- [x] Compressed (deflated) `.drawio` files
+```bash
+drawio-digest examples/order-review.drawio
+```
 
-**Interface**
+```
+flowchart TD
+    subgraph lane0["Customer"]
+        n0(["Start"])
+        n1["Browse catalogue"]
+        n2["Place order"]
+        n3["Pay"]
+        n4(["End"])
+    end
+    subgraph lane1["Store"]
+        n5{"In stock?"}
+        n6["Reserve items"]
+        n7["Create backorder"]
+        n8["Ship parcel"]
+    end
 
-- [x] Batch conversion, with `-o` to redirect output
-- [x] `-` reads from stdin, `--stdout` prints instead of writing
-- [x] `--strict` exits non-zero when an edge could not be resolved, for CI
-- [x] Stable node numbering, so regenerated output stays diffable
-- [x] Python API — `parse`, `parse_string`, `to_markdown`, `to_mermaid`, `to_json`, `to_summary`
-- [x] Zero dependencies, Python 3.8+
+    n0 --> n1
+    n1 --> n2
+    n2 -->|"submit"| n5
+    n5 -->|"yes"| n6
+    n5 -->|"no"| n7
+    n6 -->|"invoice"| n3
+    n3 -->|"paid"| n8
+    n8 --> n4
+    n7 -->|"restocked"| n5
+```
 
-**Not done**
+That diagram is not an image — it is the actual output, a Markdown file with
+a fenced Mermaid block per page, rendered by GitHub. Lanes become `subgraph`
+blocks, rhombus and ellipse shapes are preserved, and edge labels survive
+whether they are stored on the edge or as separate `edgeLabel` cells. Node
+numbering is stable, so regenerated output stays diffable.
 
-- [ ] Sequence, class and ER diagrams — flowcharts only
-- [ ] Layout, colours and styling beyond node shape
-- [ ] Images and custom shape libraries
-- [ ] Nested lanes — an inner lane is dropped and its nodes fall to the outer one
-- [ ] Writing `.drawio` back out — this tool only reads
+## Use it with a coding agent
+
+`drawio-digest` is a plain CLI, so Claude Code, Codex and friends can run it
+without a plugin or MCP server. Two lines in your project instructions
+(`CLAUDE.md`, `AGENTS.md`) are enough:
+
+```markdown
+Diagrams under docs/ are .drawio files. Read one with
+`drawio-digest <file> --stdout`; scan them all with `drawio-digest docs/*.drawio --summary`.
+```
+
+An agent that previously saw only coordinate XML now reads your diagrams like
+any other document. `--summary` keeps the cheap case cheap — it answers
+*"is this diagram worth opening?"* in a few lines:
+
+```
+$ drawio-digest examples/*.drawio --summary
+order-review
+Page 1: 9 nodes, 9 edges, 2 lanes
+  lanes: Customer(5), Store(4)
+  entry: Start
+  exit: End
+```
 
 ## Why not just read the XML?
 
-Because draw.io is a free-form canvas, several things that look structural on
-screen are not structural in the file. This tool handles the cases that bite:
+Because the file describes pixels, not meaning. The diagram above is stored
+like this:
+
+```xml
+<mxCell id="start" value="Start" style="ellipse;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+  <mxGeometry x="170" y="100" width="100" height="60" as="geometry" />
+</mxCell>
+<mxCell id="browse" value="Browse catalogue" style="rounded=0;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+  <mxGeometry x="140" y="220" width="160" height="50" as="geometry" />
+</mxCell>
+<!-- ...and a few hundred more lines of geometry -->
+```
+
+Worse, because draw.io is a free-form canvas, several things that look
+structural on screen are not structural in the file. This tool handles the
+cases that bite:
 
 | In the file | What it means | What naive parsing does |
 |---|---|---|
@@ -100,8 +129,10 @@ shape* highlights, not just a connection point. This tool tells you where.
 
 ## Install
 
+Not on PyPI yet. Install from a checkout:
+
 ```bash
-pip install drawio-digest
+pip install /path/to/drawio-digest
 ```
 
 Requires Python 3.8+. No dependencies.
@@ -120,26 +151,22 @@ drawio-digest FILE... [options]        # FILE may be - for stdin
       --strict                          exit non-zero if any edge was dropped
 ```
 
+```bash
+drawio-digest flow.drawio              # -> flow.md    Markdown + Mermaid
+drawio-digest flow.drawio -f mermaid   # -> flow.mmd   bare diagram source
+drawio-digest flow.drawio -f json      # -> flow.json  structured data
+drawio-digest *.drawio --summary       # one short block per diagram
+cat flow.drawio | drawio-digest -      # stdin
+```
+
 **Formats.** `markdown` is a ready-to-read document — a `# title`, a fenced
 mermaid block per page, and any review notes. `mermaid` is the bare diagram
 source, for pasting into a document you already have. `json` is the full
 model, for scripts.
 
-**`--summary`** answers *"is this diagram worth opening?"* in a few lines,
-which is the cheap first step when scanning a repository:
-
-```
-$ drawio-digest examples/*.drawio --summary
-order-review
-Page 1: 9 nodes, 9 edges, 2 lanes
-  lanes: Customer(5), Store(4)
-  entry: Start
-  exit: End
-```
-
-Nodes that touch no edge are reported as `unconnected` rather than counted
-as entry and exit points — legends and date markers are common in real
-diagrams and would otherwise misdescribe the flow.
+**`--summary`** reports nodes that touch no edge as `unconnected` rather than
+counting them as entry and exit points — legends and date markers are common
+in real diagrams and would otherwise misdescribe the flow.
 
 **`--strict`** is for CI: fail the build when a diagram contains connections
 that cannot be resolved.
@@ -161,50 +188,57 @@ print(to_markdown(diagram, direction="LR"))
 diagram = parse_string(xml_text)          # already in memory
 ```
 
-## Output
+## Features
 
-`examples/order-review.drawio` is a two-lane order flow. Running
-`drawio-digest examples/order-review.drawio` produces:
+<details>
+<summary><b>Output</b></summary>
 
-````markdown
-# order-review
+- [x] Markdown document — a title, a fenced mermaid block per page, review notes
+- [x] Bare Mermaid source, for embedding in a document you already have
+- [x] JSON, for scripts and further processing
+- [x] `--summary` — shape, lanes, entry/exit points in a few lines
+- [x] `--direction TD|LR|BT|RL` for Mermaid flow direction
+- [x] Multi-page diagrams — one section and one block per page
 
-```mermaid
-flowchart TD
-    subgraph lane0["Customer"]
-        n0(["Start"])
-        n1["Browse catalogue"]
-        n2["Place order"]
-        n3["Pay"]
-        n4(["End"])
-    end
-    subgraph lane1["Store"]
-        n5{"In stock?"}
-        n6["Reserve items"]
-        n7["Create backorder"]
-        n8["Ship parcel"]
-    end
+</details>
 
-    n0 --> n1
-    n1 --> n2
-    n2 -->|"submit"| n5
-    n5 -->|"yes"| n6
-    n5 -->|"no"| n7
-    n6 -->|"invoice"| n3
-    n3 -->|"paid"| n8
-    n8 --> n4
-    n7 -->|"restocked"| n5
-```
-````
+<details>
+<summary><b>Structure recovery</b></summary>
 
-Lanes become `subgraph` blocks, rhombus and ellipse shapes are preserved,
-and edge labels survive whether they are stored on the edge or as separate
-`edgeLabel` cells. Multi-page diagrams produce one `##` section and one
-fenced block per page.
+- [x] Lanes detected by containment, including plain rectangles used as lanes
+- [x] Explicit `swimlane` shapes
+- [x] Flat diagrams with no lanes at all
+- [x] Node shapes — box, diamond, ellipse
+- [x] Edge labels stored inline *or* as separate `edgeLabel` cells
+- [x] Endpoints that look attached but are not, reattached by coordinate and flagged
+- [x] Unresolvable endpoints reported, never guessed
+- [x] `endArrow=none` dividers and unconnected annotations excluded from the flow
+- [x] Compressed (deflated) `.drawio` files
 
-Node ids are numbered lane by lane rather than in document order, so editing
-one part of a diagram does not renumber the rest — regenerated output stays
-diffable.
+</details>
+
+<details>
+<summary><b>Interface</b></summary>
+
+- [x] Batch conversion, with `-o` to redirect output
+- [x] `-` reads from stdin, `--stdout` prints instead of writing
+- [x] `--strict` exits non-zero when an edge could not be resolved, for CI
+- [x] Stable node numbering, so regenerated output stays diffable
+- [x] Python API — `parse`, `parse_string`, `to_markdown`, `to_mermaid`, `to_json`, `to_summary`
+- [x] Zero dependencies, Python 3.8+
+
+</details>
+
+<details>
+<summary><b>Not done</b></summary>
+
+- [ ] Sequence, class and ER diagrams — flowcharts only
+- [ ] Layout, colours and styling beyond node shape
+- [ ] Images and custom shape libraries
+- [ ] Nested lanes — an inner lane is dropped and its nodes fall to the outer one
+- [ ] Writing `.drawio` back out — this tool only reads
+
+</details>
 
 ## Limitations
 
