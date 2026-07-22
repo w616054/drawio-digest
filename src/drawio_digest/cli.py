@@ -1,5 +1,6 @@
 """Command line entry point."""
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -8,6 +9,38 @@ from .parser import parse, parse_string
 from .render import to_json, to_markdown, to_mermaid, to_summary
 
 EXT = {"markdown": ".md", "mermaid": ".mmd", "json": ".json"}
+
+# Characters no common filesystem accepts in a name. Page names are free
+# text, so they reach us holding anything the user typed.
+_UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def _page_filename(stem, page_name, index, ext, taken):
+    """Build 'stem-pagename.ext', keeping it legal and unique.
+
+    Falling back to the page index keeps every page addressable: a name that
+    sanitises to nothing, or collides with a sibling, would otherwise
+    overwrite a file that was already written.
+
+    Length is deliberately not capped -- an over-long name makes write_text
+    raise OSError, which the caller already reports.
+    """
+    safe = _UNSAFE.sub("-", page_name)
+    # Trailing dots and surrounding blanks are rejected by Windows, and ".."
+    # would climb out of the output directory.
+    safe = safe.strip().strip(".").strip()
+    # A name made up entirely of replaced characters (e.g. "///") is not
+    # meaningfully different from an empty one.
+    if not safe.strip("-"):
+        safe = "page-%d" % index
+
+    name = "%s-%s" % (stem, safe)
+    candidate, suffix = name, 2
+    while candidate in taken:
+        candidate = "%s-%d" % (name, suffix)
+        suffix += 1
+    taken.add(candidate)
+    return candidate + ext
 
 
 def build_parser():

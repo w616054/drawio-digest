@@ -189,6 +189,54 @@ class TestFilteredRendering:
         assert "## Detail/Sub" in out
 
 
+class TestPageFilename:
+    def name(self, page_name, index=1, taken=None):
+        from drawio_digest.cli import _page_filename
+        return _page_filename("order", page_name, index, ".md",
+                              set() if taken is None else taken)
+
+    def test_plain_name(self):
+        assert self.name("Overview") == "order-Overview.md"
+
+    def test_path_separator_is_replaced(self):
+        """A '/' in a page name must not create a subdirectory."""
+        assert self.name("Detail/Sub") == "order-Detail-Sub.md"
+
+    def test_windows_illegal_characters_are_replaced(self):
+        assert self.name('a:b"c|d?e*f<g>h') == "order-a-b-c-d-e-f-g-h.md"
+
+    def test_backslash_is_replaced(self):
+        assert self.name("a\\b") == "order-a-b.md"
+
+    def test_control_characters_are_replaced(self):
+        assert self.name("a\tb") == "order-a-b.md"
+
+    def test_surrounding_whitespace_and_dots_are_stripped(self):
+        assert self.name("  Draft.  ") == "order-Draft.md"
+
+    def test_dot_dot_cannot_escape_the_directory(self):
+        assert self.name("..") == "order-page-1.md"
+
+    def test_empty_name_falls_back_to_index(self):
+        assert self.name("", index=3) == "order-page-3.md"
+
+    def test_name_that_sanitises_to_nothing_falls_back(self):
+        assert self.name("///", index=2) == "order-page-2.md"
+
+    def test_collisions_get_a_suffix(self):
+        taken = set()
+        first = self.name("A/B", taken=taken)
+        second = self.name("A:B", taken=taken)
+        third = self.name("A|B", taken=taken)
+        assert first == "order-A-B.md"
+        assert second == "order-A-B-2.md"
+        assert third == "order-A-B-3.md"
+
+    def test_cjk_is_preserved(self):
+        """Page names are user content; only illegal characters change."""
+        assert self.name("订单流程") == "order-订单流程.md"
+
+
 class TestLabels:
     def test_br_becomes_separator(self, lanes):
         assert "确认接收 / 通知" in labels(lanes)
