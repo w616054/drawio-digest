@@ -95,6 +95,16 @@ class TestMultiPage:
         assert len(pages[1].dropped) == 1
 
 
+class TestFilteredFlag:
+    def test_defaults_to_false(self):
+        assert parse(FIXTURES / "multipage.drawio").filtered is False
+
+    def test_json_exposes_it(self):
+        """asdict() is the JSON renderer; a new field must not break it."""
+        data = json.loads(to_json(parse(FIXTURES / "multipage.drawio")))
+        assert data["filtered"] is False
+
+
 class TestLabels:
     def test_br_becomes_separator(self, lanes):
         assert "确认接收 / 通知" in labels(lanes)
