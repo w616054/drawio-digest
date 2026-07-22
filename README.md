@@ -20,6 +20,48 @@ It is a plain CLI, which means both you and a coding agent can use it —
 Claude Code, Codex and friends already know how to run shell commands, so
 no plugin or integration is required.
 
+[中文文档](README.zh-CN.md)
+
+## Features
+
+**Output**
+
+- [x] Markdown document — a title, a fenced mermaid block per page, review notes
+- [x] Bare Mermaid source, for embedding in a document you already have
+- [x] JSON, for scripts and further processing
+- [x] `--summary` — shape, lanes, entry/exit points in a few lines
+- [x] `--direction TD|LR|BT|RL` for Mermaid flow direction
+- [x] Multi-page diagrams — one section and one block per page
+
+**Structure recovery**
+
+- [x] Lanes detected by containment, including plain rectangles used as lanes
+- [x] Explicit `swimlane` shapes
+- [x] Flat diagrams with no lanes at all
+- [x] Node shapes — box, diamond, ellipse
+- [x] Edge labels stored inline *or* as separate `edgeLabel` cells
+- [x] Endpoints that look attached but are not, reattached by coordinate and flagged
+- [x] Unresolvable endpoints reported, never guessed
+- [x] `endArrow=none` dividers and unconnected annotations excluded from the flow
+- [x] Compressed (deflated) `.drawio` files
+
+**Interface**
+
+- [x] Batch conversion, with `-o` to redirect output
+- [x] `-` reads from stdin, `--stdout` prints instead of writing
+- [x] `--strict` exits non-zero when an edge could not be resolved, for CI
+- [x] Stable node numbering, so regenerated output stays diffable
+- [x] Python API — `parse`, `parse_string`, `to_markdown`, `to_mermaid`, `to_json`, `to_summary`
+- [x] Zero dependencies, Python 3.8+
+
+**Not done**
+
+- [ ] Sequence, class and ER diagrams — flowcharts only
+- [ ] Layout, colours and styling beyond node shape
+- [ ] Images and custom shape libraries
+- [ ] Nested lanes — an inner lane is dropped and its nodes fall to the outer one
+- [ ] Writing `.drawio` back out — this tool only reads
+
 ## Why not just read the XML?
 
 Because draw.io is a free-form canvas, several things that look structural on

@@ -69,6 +69,15 @@ class TestNoLanes:
         assert "说明：本图仅供参考" in {n.label for n in page.nodes}
 
 
+class TestCompressed:
+    def test_compressed_diagram_is_decoded(self):
+        """draw.io stores pages deflated unless the user opts out."""
+        page = parse(FIXTURES / "compressed.drawio").pages[0]
+        assert page.name == "Zipped"
+        assert {n.label for n in page.nodes} == {"Compressed A", "Compressed B"}
+        assert len(page.edges) == 1
+
+
 class TestLabels:
     def test_br_becomes_separator(self, lanes):
         assert "确认接收 / 通知" in labels(lanes)
@@ -195,11 +204,30 @@ class TestReadme:
 
     ROOT = Path(__file__).parent.parent
 
-    def test_example_matches_documented_output(self):
-        readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
+    @pytest.mark.parametrize("name", ["README.md", "README.zh-CN.md"])
+    def test_example_matches_documented_output(self, name):
+        readme = (self.ROOT / name).read_text(encoding="utf-8")
         claimed = re.search(r"````markdown\n(.*?)````", readme, re.S).group(1).strip()
         actual = to_markdown(parse(self.ROOT / "examples" / "order-review.drawio")).strip()
         assert claimed == actual
+
+    @pytest.mark.parametrize("name", ["README.md", "README.zh-CN.md"])
+    def test_feature_lists_agree(self, name):
+        """Both READMEs must claim the same set of done/not-done items."""
+        def items(path):
+            text = (self.ROOT / path).read_text(encoding="utf-8")
+            done = len(re.findall(r"^- \[x\] ", text, re.M))
+            todo = len(re.findall(r"^- \[ \] ", text, re.M))
+            return done, todo
+
+        assert items(name) == items("README.md")
+        assert items(name)[0] > 0, "expected a feature checklist"
+
+    def test_readmes_link_to_each_other(self):
+        en = (self.ROOT / "README.md").read_text(encoding="utf-8")
+        zh = (self.ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
+        assert "README.zh-CN.md" in en
+        assert "README.md" in zh
 
     def test_supported_formats_are_described_consistently(self):
         """README, package metadata and --help must name the same formats."""
