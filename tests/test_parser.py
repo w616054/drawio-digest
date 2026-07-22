@@ -471,3 +471,136 @@ class TestCli:
     def test_missing_file_reports_error(self, capsys):
         assert main(["nope.drawio"]) == 2
         assert "nope.drawio" in capsys.readouterr().err
+
+
+class TestPageOption:
+    MULTI = None  # set in setup_method
+
+    def setup_method(self):
+        self.MULTI = str(FIXTURES / "multipage.drawio")
+
+    def test_selects_one_page_by_index(self, tmp_path, capsys):
+        assert main([self.MULTI, "--page", "1", "-o", str(tmp_path)]) == 0
+        out = (tmp_path / "multipage.md").read_text(encoding="utf-8")
+        assert "Start" in out
+        assert "Check" not in out
+
+    def test_selects_one_page_by_name(self, tmp_path):
+        assert main([self.MULTI, "--page", "Overview", "-o", str(tmp_path)]) == 0
+        out = (tmp_path / "multipage.md").read_text(encoding="utf-8")
+        assert "Start" in out
+        assert "Check" not in out
+
+    def test_is_repeatable(self, tmp_path):
+        assert main([self.MULTI, "--page", "1", "--page", "2",
+                     "-o", str(tmp_path)]) == 0
+        out = (tmp_path / "multipage.md").read_text(encoding="utf-8")
+        assert "Start" in out
+        assert "Check" in out
+
+    def test_unknown_page_reports_and_exits_2(self, tmp_path, capsys):
+        assert main([self.MULTI, "--page", "nope", "-o", str(tmp_path)]) == 2
+        err = capsys.readouterr().err
+        assert "no page matches" in err
+        assert "Overview" in err
+
+    def test_unknown_page_writes_nothing(self, tmp_path):
+        main([self.MULTI, "--page", "nope", "-o", str(tmp_path)])
+        assert list(tmp_path.glob("*.md")) == []
+
+    def test_combines_with_stdout(self, capsys):
+        assert main([self.MULTI, "--page", "1", "--stdout"]) == 0
+        out = capsys.readouterr().out
+        assert "Start" in out
+        assert "Check" not in out
+
+    def test_combines_with_summary(self, capsys):
+        assert main([self.MULTI, "--page", "1", "--summary"]) == 0
+        out = capsys.readouterr().out
+        assert "Overview" in out
+        assert "Detail/Sub" not in out
+
+    def test_strict_ignores_unselected_pages(self, tmp_path):
+        """Page 2 holds the only dropped edge; asking for page 1 must pass."""
+        args = [self.MULTI, "-o", str(tmp_path), "--strict"]
+        assert main(args) == 1
+        assert main(args + ["--page", "1"]) == 0
+        assert main(args + ["--page", "2"]) == 1
+
+
+class TestSplitOption:
+    def setup_method(self):
+        self.MULTI = str(FIXTURES / "multipage.drawio")
+
+    def test_writes_one_file_per_page(self, tmp_path):
+        assert main([self.MULTI, "--split", "-o", str(tmp_path)]) == 0
+        assert {p.name for p in tmp_path.glob("*.md")} == {
+            "multipage-Overview.md",
+            "multipage-Detail-Sub.md",
+            "multipage-Page.md",
+        }
+
+    def test_each_file_holds_only_its_page(self, tmp_path):
+        main([self.MULTI, "--split", "-o", str(tmp_path)])
+        first = (tmp_path / "multipage-Overview.md").read_text(encoding="utf-8")
+        assert "Start" in first
+        assert "Check" not in first
+
+    def test_file_is_titled_by_page_not_source(self, tmp_path):
+        """The filename already carries the source; '# multipage' adds nothing."""
+        main([self.MULTI, "--split", "-o", str(tmp_path)])
+        first = (tmp_path / "multipage-Overview.md").read_text(encoding="utf-8")
+        assert first.startswith("# Overview")
+
+    def test_split_files_have_no_section_heading(self, tmp_path):
+        """One page per file: the '## name' level would be redundant."""
+        main([self.MULTI, "--split", "-o", str(tmp_path)])
+        first = (tmp_path / "multipage-Overview.md").read_text(encoding="utf-8")
+        assert "## " not in first
+
+    def test_honours_the_format_extension(self, tmp_path):
+        assert main([self.MULTI, "--split", "-f", "mermaid",
+                     "-o", str(tmp_path)]) == 0
+        assert (tmp_path / "multipage-Overview.mmd").exists()
+
+    def test_combines_with_page(self, tmp_path):
+        assert main([self.MULTI, "--split", "--page", "2",
+                     "-o", str(tmp_path)]) == 0
+        assert {p.name for p in tmp_path.glob("*.md")} == {"multipage-Detail-Sub.md"}
+
+    def test_reports_dropped_per_file(self, tmp_path, capsys):
+        main([self.MULTI, "--split", "-o", str(tmp_path)])
+        lines = capsys.readouterr().out.splitlines()
+        detail = next(ln for ln in lines if "Detail-Sub" in ln)
+        overview = next(ln for ln in lines if "Overview" in ln)
+        assert "(dropped 1)" in detail
+        # Not a bare "dropped": tmp_path carries the test's own name.
+        assert "(dropped" not in overview
+
+    def test_names_differing_only_in_case_get_distinct_files(self, tmp_path):
+        """'Overview' and 'overview' are one file on macOS and Windows."""
+        assert main([str(FIXTURES / "casepages.drawio"), "--split",
+                     "-o", str(tmp_path)]) == 0
+        written = sorted(p.name for p in tmp_path.glob("*.md"))
+        assert len(written) == 2
+        bodies = [(tmp_path / n).read_text(encoding="utf-8") for n in written]
+        assert any("Upper" in b for b in bodies)
+        assert any("Lower" in b for b in bodies)
+
+    def test_rejects_stdout(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            main([self.MULTI, "--split", "--stdout"])
+        assert exc.value.code == 2
+        assert "--stdout" in capsys.readouterr().err
+
+    def test_rejects_summary(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            main([self.MULTI, "--split", "--summary"])
+        assert exc.value.code == 2
+        assert "--summary" in capsys.readouterr().err
+
+    def test_rejects_stdin(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            main(["-", "--split"])
+        assert exc.value.code == 2
+        assert "stdin" in capsys.readouterr().err

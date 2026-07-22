@@ -5,8 +5,10 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .model import Diagram
 from .parser import parse, parse_string
 from .render import to_json, to_markdown, to_mermaid, to_summary
+from .select import PageNotFound, select_pages
 
 EXT = {"markdown": ".md", "mermaid": ".mmd", "json": ".json"}
 
@@ -57,6 +59,24 @@ def _page_filename(stem, page_name, index, ext, taken):
     return candidate + ext
 
 
+def _unique_page_filename(stem, page_name, index, ext, taken, seen_folded):
+    """Like _page_filename, but unique on case-insensitive filesystems too.
+
+    macOS and Windows treat 'order-Overview.md' and 'order-overview.md' as one
+    file, so pages named 'Overview' and 'overview' would silently overwrite
+    each other. Case-folded names are tracked separately; a clash asks
+    _page_filename for another candidate, which it suffixes because the
+    rejected one stayed in `taken`. The name written keeps the casing the
+    user gave the page.
+    """
+    while True:
+        candidate = _page_filename(stem, page_name, index, ext, taken)
+        folded = candidate.lower()
+        if folded not in seen_folded:
+            seen_folded.add(folded)
+            return candidate
+
+
 def build_parser():
     ap = argparse.ArgumentParser(
         prog="drawio-digest",
@@ -76,6 +96,11 @@ def build_parser():
                     help="print instead of writing files")
     ap.add_argument("--summary", action="store_true",
                     help="print a short overview instead of converting")
+    ap.add_argument("--page", action="append", metavar="NAME|N", dest="pages",
+                    help="only convert this page; repeatable. A number is a "
+                         "1-based index, anything else a page name")
+    ap.add_argument("--split", action="store_true",
+                    help="write one file per page instead of one per diagram")
     ap.add_argument("--direction", default="TD", choices=("TD", "LR", "BT", "RL"),
                     help="mermaid flow direction (default: TD)")
     ap.add_argument("--no-notes", action="store_true",
@@ -93,8 +118,33 @@ def _render(diagram, args):
     return to_markdown(diagram, args.direction, notes=not args.no_notes)
 
 
+def _note(*pages):
+    """Annotate a written file with what needs review inside it."""
+    recovered = sum(len(p.recovered) for p in pages)
+    dropped = sum(len(p.dropped) for p in pages)
+    note = ""
+    if recovered:
+        note += "  (recovered %d)" % recovered
+    if dropped:
+        note += "  (dropped %d)" % dropped
+    return note
+
+
 def main(argv=None):
-    args = build_parser().parse_args(argv)
+    ap = build_parser()
+    args = ap.parse_args(argv)
+
+    # These conflict outright. Degrading quietly would be worse: this tool
+    # runs in scripts, where a flag that silently does nothing is the most
+    # expensive failure mode.
+    if args.split:
+        if args.stdout:
+            ap.error("--split writes files; it cannot be combined with --stdout")
+        if args.summary:
+            ap.error("--split has no effect with --summary")
+        if "-" in args.files:
+            ap.error("--split cannot be used when reading from stdin")
+
     dropped_total = 0
     failed = False
 
@@ -111,8 +161,16 @@ def main(argv=None):
             failed = True
             continue
 
+        if args.pages:
+            try:
+                diagram = select_pages(diagram, args.pages)
+            except PageNotFound as exc:
+                print("%s: %s" % (name, exc), file=sys.stderr)
+                failed = True
+                continue
+
+        # Counted after selection, so --strict only judges what was asked for.
         dropped = sum(len(p.dropped) for p in diagram.pages)
-        recovered = sum(len(p.recovered) for p in diagram.pages)
         dropped_total += dropped
 
         if args.summary:
@@ -128,15 +186,23 @@ def main(argv=None):
         path = Path(name)
         outdir = args.outdir or path.parent
         outdir.mkdir(parents=True, exist_ok=True)
+
+        if args.split:
+            taken, seen_folded = set(), set()
+            for index, page in enumerate(diagram.pages, 1):
+                # One page per file, so it renders as a whole diagram: the H1
+                # becomes the page name and no "## name" level is added.
+                single = Diagram(name=page.name, pages=[page])
+                out = outdir / _unique_page_filename(
+                    path.stem, page.name, index, EXT[args.format],
+                    taken, seen_folded)
+                out.write_text(_render(single, args), encoding="utf-8")
+                print("%s -> %s%s" % (path, out, _note(page)))
+            continue
+
         out = outdir / (path.stem + EXT[args.format])
         out.write_text(text, encoding="utf-8")
-
-        note = ""
-        if recovered:
-            note += "  (recovered %d)" % recovered
-        if dropped:
-            note += "  (dropped %d)" % dropped
-        print("%s -> %s%s" % (path, out, note))
+        print("%s -> %s%s" % (path, out, _note(*diagram.pages)))
 
     if failed:
         return 2
