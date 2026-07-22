@@ -25,13 +25,15 @@ def _page_filename(stem, page_name, index, ext, taken):
     Length is deliberately not capped -- an over-long name makes write_text
     raise OSError, which the caller already reports.
     """
-    safe = _UNSAFE.sub("-", page_name)
+    safe, replaced = _UNSAFE.subn("-", page_name)
     # Trailing dots and surrounding blanks are rejected by Windows, and ".."
     # would climb out of the output directory.
     safe = safe.strip().strip(".").strip()
-    # A name made up entirely of replaced characters (e.g. "///") is not
-    # meaningfully different from an empty one.
-    if not safe.strip("-"):
+    # Fall back only when nothing legible survives: either the name is
+    # empty, or it is entirely the dashes substitution just introduced
+    # (e.g. "///"). A page legitimately named "-" or "--" has no replaced
+    # characters, so it is left alone.
+    if not safe or (replaced and not safe.strip("-")):
         safe = "page-%d" % index
 
     name = "%s-%s" % (stem, safe)

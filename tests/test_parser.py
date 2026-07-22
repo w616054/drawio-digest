@@ -223,6 +223,13 @@ class TestPageFilename:
     def test_name_that_sanitises_to_nothing_falls_back(self):
         assert self.name("///", index=2) == "order-page-2.md"
 
+    def test_single_dash_name_is_preserved(self):
+        """A divider page literally named '-' has nothing unsafe in it."""
+        assert self.name("-") == "order--.md"
+
+    def test_double_dash_name_is_preserved(self):
+        assert self.name("--") == "order---.md"
+
     def test_collisions_get_a_suffix(self):
         taken = set()
         first = self.name("A/B", taken=taken)
