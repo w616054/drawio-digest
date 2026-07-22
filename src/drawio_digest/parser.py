@@ -21,8 +21,13 @@ from urllib.parse import unquote
 
 from .model import Diagram, Edge, Lane, Node, Page
 
-# A titled rectangle at least this large is treated as a lane.
-LANE_MIN_AREA = 300_000
+# A candidate lane must be at least this large before containment is even
+# considered, to rule out ordinary boxes that happen to overlap a neighbour.
+LANE_MIN_AREA = 100_000
+# ...and must enclose at least this many other shapes. Absolute size alone is
+# a poor test: lane width varies with content, so a narrow lane in one diagram
+# can be smaller than a plain box in another.
+LANE_MIN_CONTAINED = 3
 # How close a dangling endpoint must sit to a shape to be reattached (px).
 SNAP_TOLERANCE = 20
 
@@ -79,7 +84,8 @@ def _parse_page(name, model):
     cells = list(model.iter("mxCell"))
     by_id = {c.get("id"): c for c in cells}
 
-    raw_nodes, raw_edges, lanes = {}, [], []
+    raw_nodes, raw_edges = {}, []
+    candidates = []  # (id, label) of shapes big enough to maybe be a lane
     edge_labels = {}
 
     for cell in cells:
@@ -96,12 +102,10 @@ def _parse_page(name, model):
                     edge_labels[cell.get("parent")] = label
                 continue
             geo = _geometry(cell)
-            if geo and label and geo[2] * geo[3] >= LANE_MIN_AREA:
-                lanes.append(Lane(cell.get("id"), label))
-            else:
-                raw_nodes[cell.get("id")] = (label, style, geo)
-
-    lane_ids = {lane.id for lane in lanes}
+            raw_nodes[cell.get("id")] = (label, style, geo)
+            explicit = "swimlane" in style
+            if label and geo and (explicit or geo[2] * geo[3] >= LANE_MIN_AREA):
+                candidates.append((cell.get("id"), label, explicit))
 
     def absolute_box(cell_id):
         """Child coordinates are parent-relative; walk up to absolutes."""
@@ -116,6 +120,32 @@ def _parse_page(name, model):
             cur = by_id.get(cur.get("parent"))
         geo = raw_nodes.get(cell_id, (None, None, None))[2]
         return (x, y, geo[2], geo[3]) if geo else None
+
+    def encloses(outer, inner):
+        ob, ib = absolute_box(outer), absolute_box(inner)
+        if not ob or not ib:
+            return False
+        cx, cy = ib[0] + ib[2] / 2, ib[1] + ib[3] / 2
+        return (ob[0] <= cx <= ob[0] + ob[2]) and (ob[1] <= cy <= ob[1] + ob[3])
+
+    # Confirm candidates: a lane is a shape that holds other shapes. Size on
+    # its own misclassifies both ways -- a wide lane and a big note look the
+    # same until you ask what sits inside them.
+    candidate_ids = {cid for cid, _, _ in candidates}
+    lanes = []
+    for cid, label, explicit in candidates:
+        # Count only ordinary shapes, so two overlapping lanes do not vouch
+        # for each other.
+        contained = sum(1 for other in raw_nodes
+                        if other != cid and other not in candidate_ids
+                        and encloses(cid, other))
+        if explicit or contained >= LANE_MIN_CONTAINED:
+            lanes.append(Lane(cid, label))
+
+    lane_ids = {lane.id for lane in lanes}
+    # Lanes are containers, not flow steps.
+    for lane in lanes:
+        raw_nodes.pop(lane.id, None)
 
     def lane_of(cell_id):
         cur, seen = by_id.get(cell_id), set()

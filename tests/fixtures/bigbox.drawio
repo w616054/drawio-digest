@@ -1,0 +1,31 @@
+<mxfile host="test" version="26.0.16">
+  <diagram name="Page 1" id="p1">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" page="0" pageScale="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="bg" value="" style="rounded=0;html=1;fillColor=#f5f5f5;" vertex="1" parent="1">
+          <mxGeometry x="0" y="0" width="900" height="900" as="geometry" />
+        </mxCell>
+        <mxCell id="note" value="说明：本图仅供参考" style="rounded=0;html=1;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="40" width="400" height="300" as="geometry" />
+        </mxCell>
+        <mxCell id="a" value="步骤一" style="rounded=0;html=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="100" width="140" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="b" value="步骤二" style="rounded=0;html=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="300" width="140" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="c" value="步骤三" style="rounded=0;html=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="500" width="140" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="html=1;" edge="1" parent="1" source="a" target="b">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="html=1;" edge="1" parent="1" source="b" target="c">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

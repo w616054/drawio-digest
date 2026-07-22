@@ -44,6 +44,30 @@ class TestLanes:
         assert got["确认接收 / 通知"] == "Subsidiary"
 
 
+class TestNoLanes:
+    """Lanes are optional -- plenty of real diagrams are flat."""
+
+    def test_flat_diagram_has_no_lanes(self):
+        page = parse(FIXTURES / "isolated.drawio").pages[0]
+        assert page.lanes == []
+        assert all(n.lane is None for n in page.nodes)
+
+    def test_flat_diagram_renders_without_subgraph(self):
+        out = to_mermaid(parse(FIXTURES / "isolated.drawio"))
+        assert "subgraph" not in out
+        assert "flowchart TD" in out
+
+    def test_big_box_without_a_title_is_not_a_lane(self):
+        """Unlabelled background rectangles are decoration."""
+        page = parse(FIXTURES / "bigbox.drawio").pages[0]
+        assert page.lanes == []
+
+    def test_big_box_holding_nothing_is_not_a_lane(self):
+        """A large titled note sits next to the flow, not around it."""
+        page = parse(FIXTURES / "bigbox.drawio").pages[0]
+        assert "说明：本图仅供参考" in {n.label for n in page.nodes}
+
+
 class TestLabels:
     def test_br_becomes_separator(self, lanes):
         assert "确认接收 / 通知" in labels(lanes)
@@ -69,7 +93,7 @@ class TestDecorations:
     def test_dashed_divider_is_ignored(self, lanes):
         """endArrow=none with no label is a divider, not a flow edge."""
         assert lanes.dropped == []
-        assert len(lanes.edges) == 4
+        assert len(lanes.edges) == 6
 
 
 class TestDanglingEndpoints:
@@ -127,13 +151,13 @@ class TestRender:
 class TestSummary:
     def test_reports_shape_and_lanes(self):
         out = to_summary(parse(FIXTURES / "lanes.drawio"))
-        assert "4 nodes, 4 edges, 2 lanes" in out
-        assert "Group(3)" in out and "Subsidiary(1)" in out
+        assert "6 nodes, 6 edges, 2 lanes" in out
+        assert "Group(3)" in out and "Subsidiary(3)" in out
 
     def test_reports_entry_and_exit(self):
         out = to_summary(parse(FIXTURES / "lanes.drawio"))
         assert "entry: 开始" in out
-        assert "exit: 确认接收 / 通知" in out
+        assert "exit: 完成" in out
 
     def test_flags_unresolved_edges(self):
         out = to_summary(parse(FIXTURES / "dangling.drawio"))

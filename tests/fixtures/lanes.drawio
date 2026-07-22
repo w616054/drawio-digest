@@ -22,6 +22,12 @@
         <mxCell id="recv" value="确认接收&lt;br&gt;通知" style="rounded=0;html=1;" vertex="1" parent="1">
           <mxGeometry x="800" y="200" width="160" height="54" as="geometry" />
         </mxCell>
+        <mxCell id="assign" value="分配任务" style="rounded=0;html=1;" vertex="1" parent="1">
+          <mxGeometry x="800" y="400" width="160" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="done" value="完成" style="rounded=0;html=1;" vertex="1" parent="1">
+          <mxGeometry x="800" y="600" width="160" height="54" as="geometry" />
+        </mxCell>
         <mxCell id="e1" style="html=1;" edge="1" parent="1" source="start" target="task">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
@@ -32,6 +38,12 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="e4" style="html=1;" edge="1" parent="1" source="check" target="recv">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" style="html=1;" edge="1" parent="1" source="recv" target="assign">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" style="html=1;" edge="1" parent="1" source="assign" target="done">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="e4label" value="通过" style="edgeLabel;html=1;" vertex="1" connectable="0" parent="e4">

@@ -26,7 +26,7 @@ screen are not structural in the file. This tool handles the cases that bite:
 
 | In the file | What it means | What naive parsing does |
 |---|---|---|
-| A large titled rectangle | A swimlane | Emits it as a giant node |
+| A large titled rectangle holding other shapes | A swimlane | Emits it as a giant node |
 | A `vertex` with `edgeLabel` style | A label *on an edge* | Emits a floating node, edge loses its label |
 | An edge with no `source` | Endpoint dropped on a connection point, not inside the shape — **looks attached on screen** | Silently loses the edge |
 | `endArrow=none` | A divider or annotation | Emits a phantom connection |
@@ -149,9 +149,13 @@ Mermaid is a constrained, auto-laid-out language and draw.io is not, so some
 loss is unavoidable and intentional:
 
 - **Layout is not preserved.** Mermaid lays out its own graph.
+- **Lanes are optional.** Flat diagrams convert fine and simply produce no
+  `subgraph` blocks.
 - **Lanes are inferred from geometry**, since real `swimlane` shapes are rare
-  in hand-drawn diagrams. A large titled rectangle that is *not* a lane will
-  be treated as one.
+  in hand-drawn diagrams. A shape counts as a lane when it has a title *and*
+  encloses at least three other shapes — size alone misclassifies both ways,
+  because a narrow lane in one diagram can be smaller than a plain box in
+  another. Explicit `swimlane` shapes are always honoured.
 - Images, custom shapes, and styling beyond node shape are dropped.
 - Compressed diagrams are supported, but if a page fails to decompress, save
   it with **File → Properties → Compressed** unchecked.
