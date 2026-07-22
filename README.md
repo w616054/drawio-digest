@@ -144,6 +144,8 @@ drawio-digest FILE... [options]        # FILE may be - for stdin
   -o, --outdir DIR                      output directory (default: alongside source)
       --stdout                          print instead of writing files
       --summary                         short overview instead of converting
+      --page NAME|N                     only convert this page; repeatable
+      --split                           write one file per page
       --direction {TD,LR,BT,RL}         mermaid flow direction (default: TD)
       --no-notes                        omit notes about recovered/dropped edges
       --strict                          exit non-zero if any edge was dropped
@@ -155,6 +157,13 @@ drawio-digest flow.drawio -f mermaid   # -> flow.mmd   bare diagram source
 drawio-digest flow.drawio -f json      # -> flow.json  structured data
 drawio-digest *.drawio --summary       # one short block per diagram
 cat flow.drawio | drawio-digest -      # stdin
+drawio-digest handbook.drawio --page "Order flow" --page 3
+drawio-digest handbook.drawio --split -o docs/
+```
+
+```
+handbook.drawio -> docs/handbook-Overview.md
+handbook.drawio -> docs/handbook-Order flow.md
 ```
 
 **Formats.** `markdown` is a ready-to-read document — a `# title`, a fenced
@@ -168,6 +177,17 @@ in real diagrams and would otherwise misdescribe the flow.
 
 **`--strict`** is for CI: fail the build when a diagram contains connections
 that cannot be resolved.
+
+**`--page NAME|N`** converts only the given page, by name or by 1-based
+index; repeat it to select several, and they come out in the order you wrote
+them. A purely numeric value is always treated as an index, even if a page
+happens to be named "2" — anything else is matched as an exact page name. An
+unknown name or out-of-range index is an error listing the pages that do
+exist.
+
+**`--split`** writes one file per page instead of one per diagram, named
+`<source>-<page>.<ext>`. It cannot be combined with `--stdout`, `--summary`,
+or stdin (`-`).
 
 ### As a library
 
@@ -221,6 +241,8 @@ diagram = parse_string(xml_text)          # already in memory
 - [x] Batch conversion, with `-o` to redirect output
 - [x] `-` reads from stdin, `--stdout` prints instead of writing
 - [x] `--strict` exits non-zero when an edge could not be resolved, for CI
+- [x] `--page NAME|N` selects individual pages, by name or 1-based index
+- [x] `--split` writes one file per page
 - [x] Stable node numbering, so regenerated output stays diffable
 - [x] Python API — `parse`, `parse_string`, `to_markdown`, `to_mermaid`, `to_json`, `to_summary`
 - [x] Zero dependencies, Python 3.8+
