@@ -8,10 +8,16 @@ opaque to scripts and LLMs. `drawio-digest` reads the geometry and recovers
 the structure: nodes, edges, labels, and lanes.
 
 ```bash
-drawio-digest flow.drawio              # -> flow.md   (Mermaid)
-drawio-digest flow.drawio -f json      # -> flow.json
-drawio-digest *.drawio -o docs/        # batch
+drawio-digest flow.drawio              # -> flow.md    Markdown + Mermaid
+drawio-digest flow.drawio -f mermaid   # -> flow.mmd   bare diagram source
+drawio-digest flow.drawio -f json      # -> flow.json  structured data
+drawio-digest *.drawio --summary       # one short block per diagram
+cat flow.drawio | drawio-digest -      # stdin
 ```
+
+It is a plain CLI, which means both you and a coding agent can use it —
+Claude Code, Codex and friends already know how to run shell commands, so
+no plugin or integration is required.
 
 ## Why not just read the XML?
 
@@ -58,23 +64,46 @@ Requires Python 3.8+. No dependencies.
 ## Usage
 
 ```
-drawio-digest FILES... [options]
+drawio-digest FILE... [options]        # FILE may be - for stdin
 
-  -f, --format {mermaid,json}   output format (default: mermaid)
-  -o, --outdir DIR              output directory (default: alongside source)
-      --stdout                  print instead of writing files
-      --direction {TD,LR,BT,RL} mermaid flow direction (default: TD)
-      --no-notes                omit review notes about recovered/dropped edges
-      --strict                  exit non-zero if any edge was dropped
+  -f, --format {markdown,mermaid,json}  output format (default: markdown)
+  -o, --outdir DIR                      output directory (default: alongside source)
+      --stdout                          print instead of writing files
+      --summary                         short overview instead of converting
+      --direction {TD,LR,BT,RL}         mermaid flow direction (default: TD)
+      --no-notes                        omit notes about recovered/dropped edges
+      --strict                          exit non-zero if any edge was dropped
 ```
 
-`--strict` is for CI — fail the build when a diagram contains connections
+**Formats.** `markdown` is a ready-to-read document — a `# title`, a fenced
+mermaid block per page, and any review notes. `mermaid` is the bare diagram
+source, for pasting into a document you already have. `json` is the full
+model, for scripts.
+
+**`--summary`** answers *"is this diagram worth opening?"* in a few lines,
+which is the cheap first step when scanning a repository:
+
+```
+$ drawio-digest docs/*.drawio --summary
+review-flow
+第 1 页: 39 nodes, 46 edges, 2 lanes
+  lanes: 二级企业(12), 集团(27)
+  entry: 开始
+  exit: 结束, 查看分数
+  dropped: 2 edge(s) unresolved
+```
+
+Nodes that touch no edge are reported as `unconnected` rather than counted
+as entry and exit points — legends and date markers are common in real
+diagrams and would otherwise misdescribe the flow.
+
+**`--strict`** is for CI: fail the build when a diagram contains connections
 that cannot be resolved.
 
 ### As a library
 
 ```python
-from drawio_digest import parse, to_mermaid
+from drawio_digest import parse, parse_string, to_markdown, to_summary
 
 diagram = parse("flow.drawio")
 for page in diagram.pages:
@@ -82,7 +111,10 @@ for page in diagram.pages:
     for edge in page.recovered:
         print("check this one:", edge.source, "->", edge.target)
 
-print(to_mermaid(diagram, direction="LR"))
+print(to_summary(diagram))
+print(to_markdown(diagram, direction="LR"))
+
+diagram = parse_string(xml_text)          # already in memory
 ```
 
 ## Output

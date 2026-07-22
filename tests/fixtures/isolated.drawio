@@ -1,0 +1,31 @@
+<mxfile host="test" version="26.0.16">
+  <diagram name="Page 1" id="p1">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" page="0" pageScale="1">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="s" value="开始" style="ellipse;html=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="40" width="80" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="mid" value="处理" style="rounded=0;html=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="200" width="120" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="e" value="结束" style="ellipse;html=1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="360" width="80" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="note1" value="图例" style="rounded=0;html=1;" vertex="1" parent="1">
+          <mxGeometry x="600" y="40" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="note2" value="年初" style="rounded=0;html=1;" vertex="1" parent="1">
+          <mxGeometry x="600" y="120" width="100" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="x1" style="html=1;" edge="1" parent="1" source="s" target="mid">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="x2" style="html=1;" edge="1" parent="1" source="mid" target="e">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

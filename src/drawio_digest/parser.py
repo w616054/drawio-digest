@@ -207,10 +207,27 @@ def _parse_page(name, model):
     return page
 
 
-def parse(path):
-    path = Path(path)
-    root = ET.parse(path).getroot()
-    diagram = Diagram(name=path.stem)
-    for name, model in _graph_models(root):
-        diagram.pages.append(_parse_page(name, model))
+def _build(root, name):
+    diagram = Diagram(name=name)
+    for page_name, model in _graph_models(root):
+        diagram.pages.append(_parse_page(page_name, model))
     return diagram
+
+
+def parse(path):
+    """Parse a .drawio file."""
+    path = Path(path)
+    try:
+        root = ET.parse(path).getroot()
+    except ET.ParseError as exc:
+        raise ValueError("不是有效的 XML：%s" % exc) from exc
+    return _build(root, path.stem)
+
+
+def parse_string(text, name="diagram"):
+    """Parse .drawio content held in memory (e.g. piped via stdin)."""
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError as exc:
+        raise ValueError("不是有效的 XML：%s" % exc) from exc
+    return _build(root, name)

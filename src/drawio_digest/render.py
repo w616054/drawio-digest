@@ -42,7 +42,15 @@ def _mermaid_page(page, direction="TD"):
     return "\n".join(lines)
 
 
-def to_mermaid(diagram, direction="TD", notes=True):
+def to_mermaid(diagram, direction="TD"):
+    """Bare Mermaid source, for embedding elsewhere.
+
+    Pages are separated by a blank line; no headings, no review notes.
+    """
+    return "\n\n".join(_mermaid_page(p, direction) for p in diagram.pages)
+
+
+def to_markdown(diagram, direction="TD", notes=True):
     """Markdown document with one fenced mermaid block per page."""
     blocks = []
     multi = len(diagram.pages) > 1
@@ -75,3 +83,49 @@ def _label(page, node_id):
 
 def to_json(diagram, indent=2):
     return json.dumps(asdict(diagram), ensure_ascii=False, indent=indent)
+
+
+def _listing(items, limit=5):
+    """Join labels, saying so when the list is cut short."""
+    head = ", ".join(items[:limit])
+    extra = len(items) - limit
+    return head + (" (+%d more)" % extra if extra > 0 else "")
+
+
+def to_summary(diagram):
+    """One short block per page: enough to decide whether to read the rest."""
+    lines = []
+    for page in diagram.pages:
+        incoming = {e.target for e in page.edges}
+        outgoing = {e.source for e in page.edges}
+        # A node touching no edge is a legend or annotation, not a start or
+        # end -- counting it as both would misdescribe the flow.
+        connected = [n for n in page.nodes if n.id in incoming or n.id in outgoing]
+        isolated = [n for n in page.nodes if n not in connected]
+        entries = [n.label for n in connected if n.id not in incoming]
+        exits = [n.label for n in connected if n.id not in outgoing]
+
+        head = "%s: %d nodes, %d edges" % (page.name, len(page.nodes), len(page.edges))
+        if page.lanes:
+            counts = ", ".join(
+                "%s(%d)" % (lane.label, sum(1 for n in page.nodes if n.lane == lane.id))
+                for lane in page.lanes
+            )
+            head += ", %d lanes" % len(page.lanes)
+            lines.append(head)
+            lines.append("  lanes: %s" % counts)
+        else:
+            lines.append(head)
+
+        if entries:
+            lines.append("  entry: %s" % _listing(entries))
+        if exits:
+            lines.append("  exit: %s" % _listing(exits))
+        if isolated:
+            lines.append("  unconnected: %d (%s)" % (len(isolated),
+                                                     _listing(sorted(n.label for n in isolated), 3)))
+        if page.recovered:
+            lines.append("  recovered: %d edge(s) reattached by coordinate" % len(page.recovered))
+        if page.dropped:
+            lines.append("  dropped: %d edge(s) unresolved" % len(page.dropped))
+    return "%s\n%s" % (diagram.name, "\n".join(lines))

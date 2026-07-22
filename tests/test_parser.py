@@ -3,7 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from drawio_digest import parse, to_json, to_mermaid
+from drawio_digest import (parse, parse_string, to_json, to_markdown,
+                           to_mermaid, to_summary)
+from drawio_digest.cli import main
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -91,10 +93,23 @@ class TestRender:
         assert 'subgraph lane0["Group"]' in out
         assert '-->|"通知"|' in out
 
+    def test_mermaid_is_bare(self):
+        """No heading and no notes -- it is meant to be embedded."""
+        out = to_mermaid(parse(FIXTURES / "dangling.drawio"))
+        assert out.startswith("flowchart")
+        assert "```" not in out
+        assert "#" not in out
+        assert "ℹ️" not in out
+
+    def test_markdown_wraps_and_titles(self):
+        out = to_markdown(parse(FIXTURES / "lanes.drawio"))
+        assert out.startswith("# lanes")
+        assert "```mermaid" in out
+
     def test_notes_can_be_suppressed(self):
         diagram = parse(FIXTURES / "dangling.drawio")
-        assert "ℹ️" in to_mermaid(diagram)
-        assert "ℹ️" not in to_mermaid(diagram, notes=False)
+        assert "ℹ️" in to_markdown(diagram)
+        assert "ℹ️" not in to_markdown(diagram, notes=False)
 
     def test_direction_is_configurable(self):
         out = to_mermaid(parse(FIXTURES / "lanes.drawio"), direction="LR")
@@ -107,3 +122,67 @@ class TestRender:
         assert {n["label"] for n in data["pages"][0]["nodes"]} == labels(
             parse(FIXTURES / "lanes.drawio").pages[0]
         )
+
+
+class TestSummary:
+    def test_reports_shape_and_lanes(self):
+        out = to_summary(parse(FIXTURES / "lanes.drawio"))
+        assert "4 nodes, 4 edges, 2 lanes" in out
+        assert "Group(3)" in out and "Subsidiary(1)" in out
+
+    def test_reports_entry_and_exit(self):
+        out = to_summary(parse(FIXTURES / "lanes.drawio"))
+        assert "entry: 开始" in out
+        assert "exit: 确认接收 / 通知" in out
+
+    def test_flags_unresolved_edges(self):
+        out = to_summary(parse(FIXTURES / "dangling.drawio"))
+        assert "recovered: 1" in out
+        assert "dropped: 1" in out
+
+    def test_is_compact(self):
+        """It exists to be cheap enough to run across a whole repo."""
+        assert len(to_summary(parse(FIXTURES / "lanes.drawio"))) < 300
+
+    def test_isolated_nodes_are_not_entries_or_exits(self):
+        """A legend box touches no edge; calling it entry *and* exit lies."""
+        out = to_summary(parse(FIXTURES / "isolated.drawio"))
+        assert "unconnected: 2" in out
+        assert "图例" not in out.split("unconnected")[0]
+        assert "entry: 开始" in out
+        assert "exit: 结束" in out
+
+
+class TestStdin:
+    def test_parse_string_matches_file(self):
+        text = (FIXTURES / "lanes.drawio").read_text(encoding="utf-8")
+        from_mem = parse_string(text, name="lanes")
+        from_disk = parse(FIXTURES / "lanes.drawio")
+        assert to_mermaid(from_mem) == to_mermaid(from_disk)
+
+    def test_invalid_xml_raises_valueerror(self):
+        with pytest.raises(ValueError):
+            parse_string("<mxfile><broken>")
+
+
+class TestCli:
+    def test_stdin_prints_to_stdout(self, monkeypatch, capsys, tmp_path):
+        import io
+        monkeypatch.setattr("sys.stdin",
+                            io.StringIO((FIXTURES / "lanes.drawio").read_text(encoding="utf-8")))
+        assert main(["-"]) == 0
+        assert "flowchart TD" in capsys.readouterr().out
+
+    def test_format_picks_extension(self, tmp_path):
+        for fmt, ext in (("markdown", ".md"), ("mermaid", ".mmd"), ("json", ".json")):
+            assert main([str(FIXTURES / "lanes.drawio"), "-f", fmt, "-o", str(tmp_path)]) == 0
+            assert (tmp_path / ("lanes" + ext)).exists()
+
+    def test_strict_fails_on_dropped_edges(self, tmp_path):
+        args = [str(FIXTURES / "dangling.drawio"), "-o", str(tmp_path)]
+        assert main(args) == 0
+        assert main(args + ["--strict"]) == 1
+
+    def test_missing_file_reports_error(self, capsys):
+        assert main(["nope.drawio"]) == 2
+        assert "nope.drawio" in capsys.readouterr().err
