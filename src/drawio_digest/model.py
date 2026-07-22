@@ -45,3 +45,8 @@ class Page:
 class Diagram:
     name: str
     pages: list = field(default_factory=list)
+    # True when --page reduced the page list. Renderers keep per-page
+    # headings in that case even for a single page, so the output still
+    # records which page it came from -- len(pages) > 1 cannot tell
+    # "page 2 of 5" apart from a file that only ever had one page.
+    filtered: bool = False

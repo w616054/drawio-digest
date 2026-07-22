@@ -4,9 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from drawio_digest import (parse, parse_string, to_json, to_markdown,
-                           to_mermaid, to_summary)
+from drawio_digest import (PageNotFound, parse, parse_string, select_pages,
+                           to_json, to_markdown, to_mermaid, to_summary)
 from drawio_digest.cli import main
+from drawio_digest.model import Diagram, Page
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -76,6 +77,194 @@ class TestCompressed:
         assert page.name == "Zipped"
         assert {n.label for n in page.nodes} == {"Compressed A", "Compressed B"}
         assert len(page.edges) == 1
+
+
+class TestMultiPage:
+    def test_every_diagram_becomes_a_page(self):
+        pages = parse(FIXTURES / "multipage.drawio").pages
+        assert [p.name for p in pages] == ["Overview", "Detail/Sub", "Page"]
+
+    def test_pages_keep_their_own_content(self):
+        pages = parse(FIXTURES / "multipage.drawio").pages
+        assert labels(pages[0]) == {"Start", "Review"}
+        assert labels(pages[1]) == {"Check", "Done"}
+
+    def test_dropped_edge_is_isolated_to_its_page(self):
+        """--strict must be able to tell which page is at fault."""
+        pages = parse(FIXTURES / "multipage.drawio").pages
+        assert pages[0].dropped == []
+        assert len(pages[1].dropped) == 1
+
+
+class TestFilteredFlag:
+    def test_defaults_to_false(self):
+        assert parse(FIXTURES / "multipage.drawio").filtered is False
+
+    def test_json_omits_it(self):
+        """It steers Markdown headings; it says nothing about the diagram.
+
+        Leaking it would also contradict itself: --split renders each page as
+        its own unfiltered Diagram, so the same --page 2 would report true
+        without --split and false with it.
+        """
+        data = json.loads(to_json(parse(FIXTURES / "multipage.drawio")))
+        assert "filtered" not in data
+        selected = select_pages(parse(FIXTURES / "multipage.drawio"), ["2"])
+        assert "filtered" not in json.loads(to_json(selected))
+
+
+class TestSelectPages:
+    @pytest.fixture
+    def diagram(self):
+        return parse(FIXTURES / "multipage.drawio")
+
+    def test_selects_by_index(self, diagram):
+        got = select_pages(diagram, ["2"])
+        assert [p.name for p in got.pages] == ["Detail/Sub"]
+
+    def test_selects_by_name(self, diagram):
+        got = select_pages(diagram, ["Overview"])
+        assert [p.name for p in got.pages] == ["Overview"]
+
+    def test_marks_the_result_filtered(self, diagram):
+        assert select_pages(diagram, ["1"]).filtered is True
+
+    def test_keeps_the_diagram_name(self, diagram):
+        assert select_pages(diagram, ["1"]).name == diagram.name
+
+    def test_does_not_mutate_the_input(self, diagram):
+        select_pages(diagram, ["1"])
+        assert len(diagram.pages) == 3
+        assert diagram.filtered is False
+
+    def test_follows_selector_order_not_document_order(self, diagram):
+        got = select_pages(diagram, ["Detail/Sub", "Overview"])
+        assert [p.name for p in got.pages] == ["Detail/Sub", "Overview"]
+
+    def test_deduplicates_selectors_hitting_one_page(self, diagram):
+        got = select_pages(diagram, ["1", "Overview"])
+        assert [p.name for p in got.pages] == ["Overview"]
+
+    def test_duplicate_page_names_are_all_kept(self):
+        """draw.io permits duplicate names; dropping one silently is worse."""
+        d = Diagram(name="d", pages=[Page(name="A"), Page(name="B"), Page(name="A")])
+        assert len(select_pages(d, ["A"]).pages) == 2
+
+    def test_index_out_of_range_raises(self, diagram):
+        with pytest.raises(PageNotFound):
+            select_pages(diagram, ["9"])
+
+    def test_zero_index_raises(self, diagram):
+        """Indexes are 1-based, so 0 is never valid."""
+        with pytest.raises(PageNotFound):
+            select_pages(diagram, ["0"])
+
+    def test_unknown_name_raises(self, diagram):
+        with pytest.raises(PageNotFound):
+            select_pages(diagram, ["nope"])
+
+    def test_error_lists_available_pages(self, diagram):
+        with pytest.raises(PageNotFound) as exc:
+            select_pages(diagram, ["nope"])
+        message = str(exc.value)
+        assert "nope" in message
+        assert "Overview" in message
+        assert "Detail/Sub" in message
+        assert "3 pages" in message
+
+    def test_numeric_selector_is_always_an_index(self):
+        """A page literally named '2' is still not matched by --page 2."""
+        d = Diagram(name="d", pages=[Page(name="2"), Page(name="first")])
+        assert select_pages(d, ["1"]).pages[0].name == "2"      # index 1
+        assert select_pages(d, ["2"]).pages[0].name == "first"  # index 2, not the name
+
+
+class TestFilteredRendering:
+    def test_single_page_file_has_no_section_heading(self):
+        """Unchanged behaviour: one page in, no page heading."""
+        assert "## " not in to_markdown(parse(FIXTURES / "lanes.drawio"))
+
+    def test_filtered_single_page_keeps_its_heading(self):
+        """Selecting page 2 of 3 must not read like a one-page file."""
+        diagram = select_pages(parse(FIXTURES / "multipage.drawio"), ["2"])
+        assert "## Detail/Sub" in to_markdown(diagram)
+
+    def test_unfiltered_multipage_still_has_headings(self):
+        out = to_markdown(parse(FIXTURES / "multipage.drawio"))
+        assert "## Overview" in out
+        assert "## Detail/Sub" in out
+
+
+class TestPageFilename:
+    def name(self, page_name, index=1, taken=None):
+        from drawio_digest.cli import _page_filename
+        return _page_filename("order", page_name, index, ".md",
+                              set() if taken is None else taken)
+
+    def test_plain_name(self):
+        assert self.name("Overview") == "order-Overview.md"
+
+    def test_path_separator_is_replaced(self):
+        """A '/' in a page name must not create a subdirectory."""
+        assert self.name("Detail/Sub") == "order-Detail-Sub.md"
+
+    def test_windows_illegal_characters_are_replaced(self):
+        assert self.name('a:b"c|d?e*f<g>h') == "order-a-b-c-d-e-f-g-h.md"
+
+    def test_backslash_is_replaced(self):
+        assert self.name("a\\b") == "order-a-b.md"
+
+    def test_control_characters_are_replaced(self):
+        assert self.name("a\tb") == "order-a-b.md"
+
+    def test_surrounding_whitespace_and_dots_are_stripped(self):
+        assert self.name("  Draft.  ") == "order-Draft.md"
+
+    def test_dot_dot_cannot_escape_the_directory(self):
+        assert self.name("..") == "order-page-1.md"
+
+    def test_empty_name_falls_back_to_index(self):
+        assert self.name("", index=3) == "order-page-3.md"
+
+    def test_name_that_sanitises_to_nothing_falls_back(self):
+        assert self.name("///", index=2) == "order-page-2.md"
+
+    def test_single_dash_name_is_preserved(self):
+        """A divider page literally named '-' has nothing unsafe in it."""
+        assert self.name("-") == "order--.md"
+
+    def test_double_dash_name_is_preserved(self):
+        assert self.name("--") == "order---.md"
+
+    def test_user_dash_beside_an_unsafe_character_survives(self):
+        """The fallback must not read a real dash as one substitution left."""
+        assert self.name("-/-") == "order----.md"
+        assert self.name("/-") == "order---.md"
+
+    def test_name_of_only_dots_and_slashes_falls_back(self):
+        assert self.name("./.", index=4) == "order-page-4.md"
+
+    def test_alternating_dots_and_blanks_fall_back(self):
+        """One trim pass peels only the outer layer off '. . .'."""
+        assert self.name(". . .", index=5) == "order-page-5.md"
+        assert self.name(". . . .", index=6) == "order-page-6.md"
+
+    def test_interior_dot_is_kept(self):
+        """Only the ends are unsafe; 'a.b' is an ordinary name."""
+        assert self.name("a.b") == "order-a.b.md"
+
+    def test_collisions_get_a_suffix(self):
+        taken = set()
+        first = self.name("A/B", taken=taken)
+        second = self.name("A:B", taken=taken)
+        third = self.name("A|B", taken=taken)
+        assert first == "order-A-B.md"
+        assert second == "order-A-B-2.md"
+        assert third == "order-A-B-3.md"
+
+    def test_cjk_is_preserved(self):
+        """Page names are user content; only illegal characters change."""
+        assert self.name("订单流程") == "order-订单流程.md"
 
 
 class TestLabels:
@@ -229,6 +418,17 @@ class TestReadme:
         assert "README.zh-CN.md" in en
         assert "README.md" in zh
 
+    def test_documented_api_is_importable_from_the_package(self):
+        """The README's import line must work as written."""
+        import drawio_digest
+
+        readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
+        documented = re.search(r"from drawio_digest import \(?(.*?)\)?\n\n",
+                               readme, re.S).group(1)
+        for name in re.findall(r"\w+", documented):
+            assert name in drawio_digest.__all__, name
+            assert hasattr(drawio_digest, name), name
+
     def test_supported_formats_are_described_consistently(self):
         """README, package metadata and --help must name the same formats."""
         from drawio_digest.cli import EXT, build_parser
@@ -288,3 +488,136 @@ class TestCli:
     def test_missing_file_reports_error(self, capsys):
         assert main(["nope.drawio"]) == 2
         assert "nope.drawio" in capsys.readouterr().err
+
+
+class TestPageOption:
+    MULTI = None  # set in setup_method
+
+    def setup_method(self):
+        self.MULTI = str(FIXTURES / "multipage.drawio")
+
+    def test_selects_one_page_by_index(self, tmp_path, capsys):
+        assert main([self.MULTI, "--page", "1", "-o", str(tmp_path)]) == 0
+        out = (tmp_path / "multipage.md").read_text(encoding="utf-8")
+        assert "Start" in out
+        assert "Check" not in out
+
+    def test_selects_one_page_by_name(self, tmp_path):
+        assert main([self.MULTI, "--page", "Overview", "-o", str(tmp_path)]) == 0
+        out = (tmp_path / "multipage.md").read_text(encoding="utf-8")
+        assert "Start" in out
+        assert "Check" not in out
+
+    def test_is_repeatable(self, tmp_path):
+        assert main([self.MULTI, "--page", "1", "--page", "2",
+                     "-o", str(tmp_path)]) == 0
+        out = (tmp_path / "multipage.md").read_text(encoding="utf-8")
+        assert "Start" in out
+        assert "Check" in out
+
+    def test_unknown_page_reports_and_exits_2(self, tmp_path, capsys):
+        assert main([self.MULTI, "--page", "nope", "-o", str(tmp_path)]) == 2
+        err = capsys.readouterr().err
+        assert "no page matches" in err
+        assert "Overview" in err
+
+    def test_unknown_page_writes_nothing(self, tmp_path):
+        main([self.MULTI, "--page", "nope", "-o", str(tmp_path)])
+        assert list(tmp_path.glob("*.md")) == []
+
+    def test_combines_with_stdout(self, capsys):
+        assert main([self.MULTI, "--page", "1", "--stdout"]) == 0
+        out = capsys.readouterr().out
+        assert "Start" in out
+        assert "Check" not in out
+
+    def test_combines_with_summary(self, capsys):
+        assert main([self.MULTI, "--page", "1", "--summary"]) == 0
+        out = capsys.readouterr().out
+        assert "Overview" in out
+        assert "Detail/Sub" not in out
+
+    def test_strict_ignores_unselected_pages(self, tmp_path):
+        """Page 2 holds the only dropped edge; asking for page 1 must pass."""
+        args = [self.MULTI, "-o", str(tmp_path), "--strict"]
+        assert main(args) == 1
+        assert main(args + ["--page", "1"]) == 0
+        assert main(args + ["--page", "2"]) == 1
+
+
+class TestSplitOption:
+    def setup_method(self):
+        self.MULTI = str(FIXTURES / "multipage.drawio")
+
+    def test_writes_one_file_per_page(self, tmp_path):
+        assert main([self.MULTI, "--split", "-o", str(tmp_path)]) == 0
+        assert {p.name for p in tmp_path.glob("*.md")} == {
+            "multipage-Overview.md",
+            "multipage-Detail-Sub.md",
+            "multipage-Page.md",
+        }
+
+    def test_each_file_holds_only_its_page(self, tmp_path):
+        main([self.MULTI, "--split", "-o", str(tmp_path)])
+        first = (tmp_path / "multipage-Overview.md").read_text(encoding="utf-8")
+        assert "Start" in first
+        assert "Check" not in first
+
+    def test_file_is_titled_by_page_not_source(self, tmp_path):
+        """The filename already carries the source; '# multipage' adds nothing."""
+        main([self.MULTI, "--split", "-o", str(tmp_path)])
+        first = (tmp_path / "multipage-Overview.md").read_text(encoding="utf-8")
+        assert first.startswith("# Overview")
+
+    def test_split_files_have_no_section_heading(self, tmp_path):
+        """One page per file: the '## name' level would be redundant."""
+        main([self.MULTI, "--split", "-o", str(tmp_path)])
+        first = (tmp_path / "multipage-Overview.md").read_text(encoding="utf-8")
+        assert "## " not in first
+
+    def test_honours_the_format_extension(self, tmp_path):
+        assert main([self.MULTI, "--split", "-f", "mermaid",
+                     "-o", str(tmp_path)]) == 0
+        assert (tmp_path / "multipage-Overview.mmd").exists()
+
+    def test_combines_with_page(self, tmp_path):
+        assert main([self.MULTI, "--split", "--page", "2",
+                     "-o", str(tmp_path)]) == 0
+        assert {p.name for p in tmp_path.glob("*.md")} == {"multipage-Detail-Sub.md"}
+
+    def test_reports_dropped_per_file(self, tmp_path, capsys):
+        main([self.MULTI, "--split", "-o", str(tmp_path)])
+        lines = capsys.readouterr().out.splitlines()
+        detail = next(ln for ln in lines if "Detail-Sub" in ln)
+        overview = next(ln for ln in lines if "Overview" in ln)
+        assert "(dropped 1)" in detail
+        # Not a bare "dropped": tmp_path carries the test's own name.
+        assert "(dropped" not in overview
+
+    def test_names_differing_only_in_case_get_distinct_files(self, tmp_path):
+        """'Overview' and 'overview' are one file on macOS and Windows."""
+        assert main([str(FIXTURES / "casepages.drawio"), "--split",
+                     "-o", str(tmp_path)]) == 0
+        written = sorted(p.name for p in tmp_path.glob("*.md"))
+        assert len(written) == 2
+        bodies = [(tmp_path / n).read_text(encoding="utf-8") for n in written]
+        assert any("Upper" in b for b in bodies)
+        assert any("Lower" in b for b in bodies)
+
+    def test_rejects_stdout(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            main([self.MULTI, "--split", "--stdout"])
+        assert exc.value.code == 2
+        assert "--stdout" in capsys.readouterr().err
+
+    def test_rejects_summary(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            main([self.MULTI, "--split", "--summary"])
+        assert exc.value.code == 2
+        assert "--summary" in capsys.readouterr().err
+
+    def test_rejects_stdin(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            main(["-", "--split"])
+        assert exc.value.code == 2
+        assert "stdin" in capsys.readouterr().err

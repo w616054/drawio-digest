@@ -53,7 +53,9 @@ def to_mermaid(diagram, direction="TD"):
 def to_markdown(diagram, direction="TD", notes=True):
     """Markdown document with one fenced mermaid block per page."""
     blocks = []
-    multi = len(diagram.pages) > 1
+    # A filtered result keeps its page headings even when one page is left:
+    # the user named that page, so which page this is remains information.
+    multi = len(diagram.pages) > 1 or diagram.filtered
     for page in diagram.pages:
         block = "```mermaid\n%s\n```" % _mermaid_page(page, direction)
         if notes and page.recovered:
@@ -84,7 +86,11 @@ def _label(page, node_id):
 
 
 def to_json(diagram, indent=2):
-    return json.dumps(asdict(diagram), ensure_ascii=False, indent=indent)
+    data = asdict(diagram)
+    # `filtered` steers Markdown headings and describes nothing about the
+    # diagram, so it has no place in the data other tools consume.
+    data.pop("filtered", None)
+    return json.dumps(data, ensure_ascii=False, indent=indent)
 
 
 def _listing(items, limit=5):

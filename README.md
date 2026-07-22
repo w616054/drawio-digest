@@ -144,6 +144,8 @@ drawio-digest FILE... [options]        # FILE may be - for stdin
   -o, --outdir DIR                      output directory (default: alongside source)
       --stdout                          print instead of writing files
       --summary                         short overview instead of converting
+      --page NAME|N                     only convert this page; repeatable
+      --split                           write one file per page
       --direction {TD,LR,BT,RL}         mermaid flow direction (default: TD)
       --no-notes                        omit notes about recovered/dropped edges
       --strict                          exit non-zero if any edge was dropped
@@ -155,6 +157,13 @@ drawio-digest flow.drawio -f mermaid   # -> flow.mmd   bare diagram source
 drawio-digest flow.drawio -f json      # -> flow.json  structured data
 drawio-digest *.drawio --summary       # one short block per diagram
 cat flow.drawio | drawio-digest -      # stdin
+drawio-digest handbook.drawio --page "Order flow" --page 3
+drawio-digest handbook.drawio --split -o docs/
+```
+
+```
+handbook.drawio -> docs/handbook-Overview.md
+handbook.drawio -> docs/handbook-Order flow.md
 ```
 
 **Formats.** `markdown` is a ready-to-read document — a `# title`, a fenced
@@ -169,10 +178,22 @@ in real diagrams and would otherwise misdescribe the flow.
 **`--strict`** is for CI: fail the build when a diagram contains connections
 that cannot be resolved.
 
+**`--page NAME|N`** converts only the given page, by name or by 1-based
+index; repeat it to select several, and they come out in the order you wrote
+them. A purely numeric value is always treated as an index, even if a page
+happens to be named "2" — anything else is matched as an exact page name. An
+unknown name or out-of-range index is an error listing the pages that do
+exist.
+
+**`--split`** writes one file per page instead of one per diagram, named
+`<source>-<page>.<ext>`. It cannot be combined with `--stdout`, `--summary`,
+or stdin (`-`).
+
 ### As a library
 
 ```python
-from drawio_digest import parse, parse_string, to_markdown, to_summary
+from drawio_digest import (parse, parse_string, select_pages, to_markdown,
+                           to_summary)
 
 diagram = parse("flow.drawio")
 for page in diagram.pages:
@@ -184,6 +205,9 @@ print(to_summary(diagram))
 print(to_markdown(diagram, direction="LR"))
 
 diagram = parse_string(xml_text)          # already in memory
+
+# The same selection --page performs; raises PageNotFound on a bad selector.
+print(to_markdown(select_pages(diagram, ["Overview", "3"])))
 ```
 
 ## Features
@@ -196,7 +220,7 @@ diagram = parse_string(xml_text)          # already in memory
 - [x] JSON, for scripts and further processing
 - [x] `--summary` — shape, lanes, entry/exit points in a few lines
 - [x] `--direction TD|LR|BT|RL` for Mermaid flow direction
-- [x] Multi-page diagrams — one section and one block per page
+- [x] Multi-page diagrams — one section and one block per page, or one file each with `--split`
 
 </details>
 
@@ -221,8 +245,10 @@ diagram = parse_string(xml_text)          # already in memory
 - [x] Batch conversion, with `-o` to redirect output
 - [x] `-` reads from stdin, `--stdout` prints instead of writing
 - [x] `--strict` exits non-zero when an edge could not be resolved, for CI
+- [x] `--page NAME|N` selects individual pages, by name or 1-based index
+- [x] `--split` writes one file per page
 - [x] Stable node numbering, so regenerated output stays diffable
-- [x] Python API — `parse`, `parse_string`, `to_markdown`, `to_mermaid`, `to_json`, `to_summary`
+- [x] Python API — `parse`, `parse_string`, `select_pages`, `to_markdown`, `to_mermaid`, `to_json`, `to_summary`
 - [x] Zero dependencies, Python 3.8+
 
 </details>
@@ -234,6 +260,7 @@ diagram = parse_string(xml_text)          # already in memory
 - [ ] Layout, colours and styling beyond node shape
 - [ ] Images and custom shape libraries
 - [ ] Nested lanes — an inner lane is dropped and its nodes fall to the outer one
+- [ ] Cross-page links — a shape linking to another page is not followed, so pages stay separate graphs
 - [ ] Writing `.drawio` back out — this tool only reads
 
 </details>
