@@ -177,10 +177,8 @@ def main(argv=None):
             print(to_summary(diagram))
             continue
 
-        text = _render(diagram, args)
-
         if args.stdout or from_stdin:
-            print(text)
+            print(_render(diagram, args))
             continue
 
         path = Path(name)
@@ -201,7 +199,7 @@ def main(argv=None):
             continue
 
         out = outdir / (path.stem + EXT[args.format])
-        out.write_text(text, encoding="utf-8")
+        out.write_text(_render(diagram, args), encoding="utf-8")
         print("%s -> %s%s" % (path, out, _note(*diagram.pages)))
 
     if failed:
