@@ -86,7 +86,11 @@ def _label(page, node_id):
 
 
 def to_json(diagram, indent=2):
-    return json.dumps(asdict(diagram), ensure_ascii=False, indent=indent)
+    data = asdict(diagram)
+    # `filtered` steers Markdown headings and describes nothing about the
+    # diagram, so it has no place in the data other tools consume.
+    data.pop("filtered", None)
+    return json.dumps(data, ensure_ascii=False, indent=indent)
 
 
 def _listing(items, limit=5):

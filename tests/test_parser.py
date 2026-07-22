@@ -4,10 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from drawio_digest import (parse, parse_string, to_json, to_markdown,
-                           to_mermaid, to_summary)
+from drawio_digest import (PageNotFound, parse, parse_string, select_pages,
+                           to_json, to_markdown, to_mermaid, to_summary)
 from drawio_digest.cli import main
-from drawio_digest.select import PageNotFound, select_pages
 from drawio_digest.model import Diagram, Page
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -101,10 +100,17 @@ class TestFilteredFlag:
     def test_defaults_to_false(self):
         assert parse(FIXTURES / "multipage.drawio").filtered is False
 
-    def test_json_exposes_it(self):
-        """asdict() is the JSON renderer; a new field must not break it."""
+    def test_json_omits_it(self):
+        """It steers Markdown headings; it says nothing about the diagram.
+
+        Leaking it would also contradict itself: --split renders each page as
+        its own unfiltered Diagram, so the same --page 2 would report true
+        without --split and false with it.
+        """
         data = json.loads(to_json(parse(FIXTURES / "multipage.drawio")))
-        assert data["filtered"] is False
+        assert "filtered" not in data
+        selected = select_pages(parse(FIXTURES / "multipage.drawio"), ["2"])
+        assert "filtered" not in json.loads(to_json(selected))
 
 
 class TestSelectPages:
@@ -411,6 +417,17 @@ class TestReadme:
         zh = (self.ROOT / "README.zh-CN.md").read_text(encoding="utf-8")
         assert "README.zh-CN.md" in en
         assert "README.md" in zh
+
+    def test_documented_api_is_importable_from_the_package(self):
+        """The README's import line must work as written."""
+        import drawio_digest
+
+        readme = (self.ROOT / "README.md").read_text(encoding="utf-8")
+        documented = re.search(r"from drawio_digest import \(?(.*?)\)?\n\n",
+                               readme, re.S).group(1)
+        for name in re.findall(r"\w+", documented):
+            assert name in drawio_digest.__all__, name
+            assert hasattr(drawio_digest, name), name
 
     def test_supported_formats_are_described_consistently(self):
         """README, package metadata and --help must name the same formats."""

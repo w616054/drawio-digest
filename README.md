@@ -192,7 +192,8 @@ or stdin (`-`).
 ### As a library
 
 ```python
-from drawio_digest import parse, parse_string, to_markdown, to_summary
+from drawio_digest import (parse, parse_string, select_pages, to_markdown,
+                           to_summary)
 
 diagram = parse("flow.drawio")
 for page in diagram.pages:
@@ -204,6 +205,9 @@ print(to_summary(diagram))
 print(to_markdown(diagram, direction="LR"))
 
 diagram = parse_string(xml_text)          # already in memory
+
+# The same selection --page performs; raises PageNotFound on a bad selector.
+print(to_markdown(select_pages(diagram, ["Overview", "3"])))
 ```
 
 ## Features
@@ -244,7 +248,7 @@ diagram = parse_string(xml_text)          # already in memory
 - [x] `--page NAME|N` selects individual pages, by name or 1-based index
 - [x] `--split` writes one file per page
 - [x] Stable node numbering, so regenerated output stays diffable
-- [x] Python API — `parse`, `parse_string`, `to_markdown`, `to_mermaid`, `to_json`, `to_summary`
+- [x] Python API — `parse`, `parse_string`, `select_pages`, `to_markdown`, `to_mermaid`, `to_json`, `to_summary`
 - [x] Zero dependencies, Python 3.8+
 
 </details>
