@@ -129,10 +129,8 @@ shape* highlights, not just a connection point. This tool tells you where.
 
 ## Install
 
-Not on PyPI yet. Install from a checkout:
-
 ```bash
-pip install /path/to/drawio-digest
+pip install drawio-digest
 ```
 
 Requires Python 3.8+. No dependencies.

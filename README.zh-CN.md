@@ -122,10 +122,8 @@ Page 1: 9 nodes, 9 edges, 2 lanes
 
 ## 安装
 
-尚未发布到 PyPI，先从源码安装：
-
 ```bash
-pip install /path/to/drawio-digest
+pip install drawio-digest
 ```
 
 需要 Python 3.8+，无第三方依赖。
