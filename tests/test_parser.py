@@ -7,6 +7,8 @@ import pytest
 from drawio_digest import (parse, parse_string, to_json, to_markdown,
                            to_mermaid, to_summary)
 from drawio_digest.cli import main
+from drawio_digest.select import PageNotFound, select_pages
+from drawio_digest.model import Diagram, Page
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -103,6 +105,72 @@ class TestFilteredFlag:
         """asdict() is the JSON renderer; a new field must not break it."""
         data = json.loads(to_json(parse(FIXTURES / "multipage.drawio")))
         assert data["filtered"] is False
+
+
+class TestSelectPages:
+    @pytest.fixture
+    def diagram(self):
+        return parse(FIXTURES / "multipage.drawio")
+
+    def test_selects_by_index(self, diagram):
+        got = select_pages(diagram, ["2"])
+        assert [p.name for p in got.pages] == ["Detail/Sub"]
+
+    def test_selects_by_name(self, diagram):
+        got = select_pages(diagram, ["Overview"])
+        assert [p.name for p in got.pages] == ["Overview"]
+
+    def test_marks_the_result_filtered(self, diagram):
+        assert select_pages(diagram, ["1"]).filtered is True
+
+    def test_keeps_the_diagram_name(self, diagram):
+        assert select_pages(diagram, ["1"]).name == diagram.name
+
+    def test_does_not_mutate_the_input(self, diagram):
+        select_pages(diagram, ["1"])
+        assert len(diagram.pages) == 3
+        assert diagram.filtered is False
+
+    def test_follows_selector_order_not_document_order(self, diagram):
+        got = select_pages(diagram, ["Detail/Sub", "Overview"])
+        assert [p.name for p in got.pages] == ["Detail/Sub", "Overview"]
+
+    def test_deduplicates_selectors_hitting_one_page(self, diagram):
+        got = select_pages(diagram, ["1", "Overview"])
+        assert [p.name for p in got.pages] == ["Overview"]
+
+    def test_duplicate_page_names_are_all_kept(self):
+        """draw.io permits duplicate names; dropping one silently is worse."""
+        d = Diagram(name="d", pages=[Page(name="A"), Page(name="B"), Page(name="A")])
+        assert len(select_pages(d, ["A"]).pages) == 2
+
+    def test_index_out_of_range_raises(self, diagram):
+        with pytest.raises(PageNotFound):
+            select_pages(diagram, ["9"])
+
+    def test_zero_index_raises(self, diagram):
+        """Indexes are 1-based, so 0 is never valid."""
+        with pytest.raises(PageNotFound):
+            select_pages(diagram, ["0"])
+
+    def test_unknown_name_raises(self, diagram):
+        with pytest.raises(PageNotFound):
+            select_pages(diagram, ["nope"])
+
+    def test_error_lists_available_pages(self, diagram):
+        with pytest.raises(PageNotFound) as exc:
+            select_pages(diagram, ["nope"])
+        message = str(exc.value)
+        assert "nope" in message
+        assert "Overview" in message
+        assert "Detail/Sub" in message
+        assert "3 pages" in message
+
+    def test_numeric_selector_is_always_an_index(self):
+        """A page literally named '2' is still not matched by --page 2."""
+        d = Diagram(name="d", pages=[Page(name="2"), Page(name="first")])
+        assert select_pages(d, ["1"]).pages[0].name == "2"      # index 1
+        assert select_pages(d, ["2"]).pages[0].name == "first"  # index 2, not the name
 
 
 class TestLabels:
