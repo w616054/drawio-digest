@@ -207,8 +207,8 @@ class TestReadme:
     @pytest.mark.parametrize("name", ["README.md", "README.zh-CN.md"])
     def test_example_matches_documented_output(self, name):
         readme = (self.ROOT / name).read_text(encoding="utf-8")
-        claimed = re.search(r"````markdown\n(.*?)````", readme, re.S).group(1).strip()
-        actual = to_markdown(parse(self.ROOT / "examples" / "order-review.drawio")).strip()
+        claimed = re.search(r"\n```\n(flowchart.*?)```", readme, re.S).group(1).strip()
+        actual = to_mermaid(parse(self.ROOT / "examples" / "order-review.drawio")).strip()
         assert claimed == actual
 
     @pytest.mark.parametrize("name", ["README.md", "README.zh-CN.md"])

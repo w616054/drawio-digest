@@ -20,6 +20,10 @@ classifiers = [
 ]
 dependencies = []
 
+[project.urls]
+Homepage = "https://github.com/w616054/drawio-digest"
+Issues = "https://github.com/w616054/drawio-digest/issues"
+
 [project.optional-dependencies]
 dev = ["pytest>=7"]
 
