@@ -173,6 +173,22 @@ class TestSelectPages:
         assert select_pages(d, ["2"]).pages[0].name == "first"  # index 2, not the name
 
 
+class TestFilteredRendering:
+    def test_single_page_file_has_no_section_heading(self):
+        """Unchanged behaviour: one page in, no page heading."""
+        assert "## " not in to_markdown(parse(FIXTURES / "lanes.drawio"))
+
+    def test_filtered_single_page_keeps_its_heading(self):
+        """Selecting page 2 of 3 must not read like a one-page file."""
+        diagram = select_pages(parse(FIXTURES / "multipage.drawio"), ["2"])
+        assert "## Detail/Sub" in to_markdown(diagram)
+
+    def test_unfiltered_multipage_still_has_headings(self):
+        out = to_markdown(parse(FIXTURES / "multipage.drawio"))
+        assert "## Overview" in out
+        assert "## Detail/Sub" in out
+
+
 class TestLabels:
     def test_br_becomes_separator(self, lanes):
         assert "确认接收 / 通知" in labels(lanes)
