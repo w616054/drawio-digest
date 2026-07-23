@@ -2,6 +2,11 @@
 
 **Your `.drawio` diagrams, readable by LLMs — and by humans in code review.**
 
+[![PyPI](https://img.shields.io/pypi/v/drawio-digest)](https://pypi.org/project/drawio-digest/)
+[![CI](https://github.com/w616054/drawio-digest/actions/workflows/ci.yml/badge.svg)](https://github.com/w616054/drawio-digest/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/pypi/pyversions/drawio-digest)](https://pypi.org/project/drawio-digest/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 [中文文档](README.zh-CN.md)
 
 draw.io saves a *canvas* — shapes and coordinates, not meaning. That makes
@@ -134,6 +139,7 @@ pip install drawio-digest
 ```
 
 Requires Python 3.8+. No dependencies.
+[On PyPI](https://pypi.org/project/drawio-digest/).
 
 ## Usage
 
@@ -293,4 +299,4 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"
 
 ## License
 
-MIT
+[MIT](LICENSE)
