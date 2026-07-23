@@ -2,6 +2,11 @@
 
 **让 LLM——以及 code review 里的人——能真正读懂你的 `.drawio` 图。**
 
+[![PyPI](https://img.shields.io/pypi/v/drawio-digest)](https://pypi.org/project/drawio-digest/)
+[![CI](https://github.com/w616054/drawio-digest/actions/workflows/ci.yml/badge.svg)](https://github.com/w616054/drawio-digest/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/pypi/pyversions/drawio-digest)](https://pypi.org/project/drawio-digest/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 [English](README.md)
 
 draw.io 保存的是一块*画布*——形状和坐标，不是含义。这让图纸对 reviewer、脚本
@@ -127,6 +132,7 @@ pip install drawio-digest
 ```
 
 需要 Python 3.8+，无第三方依赖。
+[PyPI 页面](https://pypi.org/project/drawio-digest/)。
 
 ## 用法
 
@@ -278,4 +284,4 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"
 
 ## License
 
-MIT
+[MIT](LICENSE)
